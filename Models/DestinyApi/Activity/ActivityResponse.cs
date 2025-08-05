@@ -2,7 +2,7 @@
 
 namespace API.Models.DestinyApi.Activity
 {
-    internal class ActivityResponse
+    public class ActivityResponse
     {
         [JsonPropertyName("activities")]
         public required List<Activity> Activities { get; set; }

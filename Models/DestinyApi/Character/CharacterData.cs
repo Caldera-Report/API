@@ -2,7 +2,7 @@
 
 namespace API.Models.DestinyApi.Character
 {
-    internal class CharacterData
+    public class CharacterData
     {
         [JsonPropertyName("data")]
         public required Dictionary<string, Character> Data { get; set; }

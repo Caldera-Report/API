@@ -1,6 +1,6 @@
 ﻿namespace API.Models.DestinyApi
 {
-    internal class DestinyApiResponse<T>
+    public class DestinyApiResponse<T>
     {
         public required T Response { get; set; }
         public int ErrorCode { get; set; }

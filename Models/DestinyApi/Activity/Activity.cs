@@ -2,7 +2,7 @@
 
 namespace API.Models.DestinyApi.Activity
 {
-    internal class Activity
+    public class Activity
     {
         [JsonPropertyName("activityHash")]
         public required uint ActivityHash { get; set; }

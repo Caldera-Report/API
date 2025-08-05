@@ -2,7 +2,7 @@
 
 namespace API.Models.DestinyApi.Activity
 {
-    internal class BasicStats
+    public class BasicStats
     {
         [JsonPropertyName("value")]
         public required double Value { get; set; }

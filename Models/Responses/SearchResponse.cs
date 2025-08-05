@@ -6,11 +6,11 @@ using System.Threading.Tasks;
 
 namespace API.Models.Responses
 {
-    internal class SearchResponse
+    public class SearchResponse
     {
         public required List<SearchResult> Results { get; set; }
     }
-    internal class SearchResult
+    public class SearchResult
     {
         public required string DisplayName { get; set; }
         public required int DisplayNameCode { get; set; }

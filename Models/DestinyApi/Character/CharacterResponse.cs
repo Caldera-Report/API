@@ -2,7 +2,7 @@
 
 namespace API.Models.DestinyApi.Character
 {
-    internal class CharacterResponse
+    public class CharacterResponse
     {
         [JsonPropertyName("responseMintedTimestamp")]
         public DateTime ResponseMinted { get; set; }

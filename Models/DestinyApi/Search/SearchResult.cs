@@ -2,7 +2,7 @@
 
 namespace API.Models.DestinyApi.Search
 {
-    internal class SearchResult
+    public class SearchResult
     {
         [JsonPropertyName("bungieGlobalDisplayName")]
         public required string BungieGlobalDisplayName { get; set; }

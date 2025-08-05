@@ -8,7 +8,7 @@ using System.Text.Json;
 
 namespace API.Clients
 {
-    internal class Destiny2ApiClient : IDestiny2ApiClient
+    public class Destiny2ApiClient : IDestiny2ApiClient
     {
         private readonly HttpClient _httpClient;
         private readonly string _apiKey;

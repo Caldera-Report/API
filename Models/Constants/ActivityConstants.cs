@@ -1,6 +1,6 @@
 ﻿namespace API.Models.Constants
 {
-    internal class ActivityConstants
+    public class ActivityConstants
     {
         public const uint SoloOps = 3851289711;
         public const uint FireteamOps = 556925641;

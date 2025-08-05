@@ -2,7 +2,7 @@
 
 namespace API.Models.DestinyApi.Search
 {
-    internal class DestinyMembership
+    public class DestinyMembership
     {
         [JsonPropertyName("isPublic")]
         public required bool IsPublic { get; set; }

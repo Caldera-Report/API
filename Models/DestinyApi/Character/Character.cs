@@ -2,7 +2,7 @@
 
 namespace API.Models.DestinyApi.Character
 {
-    internal class Character
+    public class Character
     {
         [JsonPropertyName("membershipId")]
         public required string MembershipId { get; set; }

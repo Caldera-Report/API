@@ -5,7 +5,7 @@ using API.Models.DestinyApi.Search;
 
 namespace API.Clients.Abstract
 {
-    internal interface IDestiny2ApiClient
+    public interface IDestiny2ApiClient
     {
         public Task<DestinyApiResponse<SearchResponse>> PerformSearch(string playerName);
         public Task<DestinyApiResponse<CharacterResponse>> GetCharactersForPlayer(string membershipId, int membershipType);
