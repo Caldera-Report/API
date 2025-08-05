@@ -27,6 +27,9 @@ namespace API.Functions
         {
             using var operation = _telemetryClient.StartOperation<RequestTelemetry>("Search-Function");
 
+            if (playerName[^5] == '#')
+                playerName = playerName[..^5];
+
             _logger.LogInformation($"Search request for {playerName}");
             if (string.IsNullOrEmpty(playerName)) {
                 return new BadRequestObjectResult("Player name is required");
