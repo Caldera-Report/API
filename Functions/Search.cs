@@ -22,7 +22,7 @@ namespace API.Functions
         }
 
         [Function("Search")]
-        public async Task<IActionResult> Run([HttpTrigger(AuthorizationLevel.Function, "get", Route = "search/{playerName}")] HttpRequest req,
+        public async Task<IActionResult> Run([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "search/{playerName}")] HttpRequest req,
             string playerName)
         {
             using var operation = _telemetryClient.StartOperation<RequestTelemetry>("Search-Function");

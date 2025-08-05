@@ -22,7 +22,7 @@ public class Player
     }
 
     [Function("Player")]
-    public async Task<IActionResult> Run([HttpTrigger(AuthorizationLevel.Function, "get", Route = "player/{membershipTypeId}/{membershipId}")] HttpRequest req, int membershipTypeId, string membershipId)
+    public async Task<IActionResult> Run([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "player/{membershipTypeId}/{membershipId}")] HttpRequest req, int membershipTypeId, string membershipId)
     {
         using var operation = _telemetryClient.StartOperation<RequestTelemetry>("Player-Statistics");
         
