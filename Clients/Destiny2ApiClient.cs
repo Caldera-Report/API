@@ -3,7 +3,9 @@ using API.Models.DestinyApi;
 using API.Models.DestinyApi.Activity;
 using API.Models.DestinyApi.Character;
 using API.Models.DestinyApi.Search;
+using API.Models.Options;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using System.Text.Json;
 
 namespace API.Clients
@@ -12,10 +14,15 @@ namespace API.Clients
     {
         private readonly HttpClient _httpClient;
         private readonly string _apiKey;
-        public Destiny2ApiClient(HttpClient httpClient, IConfiguration configuration)
+        public Destiny2ApiClient(HttpClient httpClient, IOptions<Destiny2Options> options)
         {
             _httpClient = httpClient;
-            _apiKey = configuration["Destiny2Api:Token"];
+            _apiKey = options.Value.Token;
+
+            if (string.IsNullOrEmpty(_apiKey))
+            {
+                throw new InvalidOperationException("Destiny2ApiToken configuration value is missing or empty");
+            }
 
             _httpClient.BaseAddress = new Uri("https://www.bungie.net/Platform/");
             _httpClient.DefaultRequestHeaders.Add("X-API-Key", _apiKey);

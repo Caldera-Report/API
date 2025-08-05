@@ -6,6 +6,8 @@ namespace API.Models.DestinyApi.Search
     {
         [JsonPropertyName("isPublic")]
         public required bool IsPublic { get; set; }
+        [JsonPropertyName("applicableMembershipTypes")]
+        public required List<int> ApplicableMembershipTypes { get; set; }
         [JsonPropertyName("membershipType")]
         public required int MembershipType { get; set; }
         [JsonPropertyName("membershipId")]

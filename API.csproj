@@ -8,6 +8,9 @@
     <UserSecretsId>ac05c2e9-ceef-43ef-93ea-023de918e6ab</UserSecretsId>
   </PropertyGroup>
   <ItemGroup>
+    <Content Include="local.settings.json" />
+  </ItemGroup>
+  <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <!-- Application Insights isn't enabled by default. See https://aka.ms/AAt8mw4. -->
      <PackageReference Include="Microsoft.ApplicationInsights.WorkerService" Version="2.23.0" /> 
