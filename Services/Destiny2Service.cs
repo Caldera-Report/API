@@ -23,7 +23,7 @@ namespace API.Services
 
         public async Task<SearchResponse> SearchForPlayer(string playerName)
         {
-            var hasBungieId = playerName[^5] == '#';
+            var hasBungieId = playerName.Length > 5 && playerName[^5] == '#';
 
             var response = hasBungieId ? 
                 await SearchByBungieName(playerName) :
