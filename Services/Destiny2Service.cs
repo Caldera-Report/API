@@ -75,9 +75,16 @@ namespace API.Services
             };
 
             var tasks = new List<DestinyApiResponse<List<SearchByBungieNameResult>>>();
-            foreach (var membershipTypeId in DestinyConstants.MembershipTypeIds)
+            var membershipTypeIds = DestinyConstants.MembershipTypeIds.ToList();
+
+            for (int i = 0; i < membershipTypeIds.Count; i += 2)
             {
-                tasks.Add( await _client.PerformSearchByBungieName(player, membershipTypeId));
+                var batch = membershipTypeIds.Skip(i).Take(2)
+                    .Select(membershipTypeId => _client.PerformSearchByBungieName(player, membershipTypeId))
+                    .ToList();
+
+                var batchResults = await Task.WhenAll(batch);
+                tasks.AddRange(batchResults);
             }
 
             var bungieNameResults = tasks.Where(r => r.Response.Count() > 0)
