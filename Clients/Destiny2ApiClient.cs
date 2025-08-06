@@ -4,8 +4,8 @@ using API.Models.DestinyApi.Activity;
 using API.Models.DestinyApi.Character;
 using API.Models.DestinyApi.Search;
 using API.Models.Options;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
+using System.Net.Http.Json;
 using System.Text.Json;
 
 namespace API.Clients
@@ -17,7 +17,7 @@ namespace API.Clients
         public Destiny2ApiClient(HttpClient httpClient, IOptions<Destiny2Options> options)
         {
             _httpClient = httpClient;
-            _apiKey = options.Value.Token;
+            _apiKey = options.Value.Token!;
 
             if (string.IsNullOrEmpty(_apiKey))
             {
@@ -27,15 +27,31 @@ namespace API.Clients
             _httpClient.BaseAddress = new Uri("https://www.bungie.net/Platform/");
             _httpClient.DefaultRequestHeaders.Add("X-API-Key", _apiKey);
         }
-        public async Task<DestinyApiResponse<SearchResponse>> PerformSearch(string playerName, int page)
+        public async Task<DestinyApiResponse<SearchResponse>> PerformSearchByPrefix(SearchByPrefix name, int page)
         {
-            var url = $"User/Search/Prefix/{Uri.EscapeDataString(playerName)}/{page}";
-            var response = await _httpClient.GetAsync(url);
+            var url = $"User/Search/GlobalName/{page}";
+            var response = await _httpClient.PostAsync(url, JsonContent.Create(name));
 
             if (response.IsSuccessStatusCode)
             {
                 var content = await response.Content.ReadAsStringAsync();
                 return JsonSerializer.Deserialize<DestinyApiResponse<SearchResponse>>(content)
+                    ?? throw new InvalidOperationException("Failed to deserialize response.");
+            }
+            else
+            {
+                throw new HttpRequestException($"Error fetching data: {response.ReasonPhrase}");
+            }
+        }
+
+        public async Task<DestinyApiResponse<List<SearchByBungieNameResult>>> PerformSearchByBungieName(SearchPlayerByName player, int membershipTypeId)
+        {
+            var url = $"Destiny2/SearchDestinyPlayerByBungieName/{membershipTypeId}/";
+            var response = await _httpClient.PostAsync(url, JsonContent.Create(player));
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                return JsonSerializer.Deserialize<DestinyApiResponse<List<SearchByBungieNameResult>>>(content)
                     ?? throw new InvalidOperationException("Failed to deserialize response.");
             }
             else

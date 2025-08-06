@@ -27,10 +27,6 @@ namespace API.Functions
         {
             using var operation = _telemetryClient.StartOperation<RequestTelemetry>("Search-Function");
 
-            
-            var hasBungieID = playerName.Length >= 5 && playerName[^5] == '#';
-            var query = hasBungieID ? playerName[..^5] : playerName;
-
             _logger.LogInformation($"Search request for {playerName}");
             if (string.IsNullOrEmpty(playerName)) {
                 return new BadRequestObjectResult("Player name is required");
@@ -38,11 +34,7 @@ namespace API.Functions
 
             try
             {
-                var searchResults = await _destiny2Service.SearchForPlayer(query);
-                if (hasBungieID)
-                    searchResults.Results = searchResults.Results
-                        .Where(r => r.DisplayName + "#" + r.DisplayNameCode.ToString() == playerName)
-                        .ToList();
+                var searchResults = await _destiny2Service.SearchForPlayer(playerName);
                 return new OkObjectResult(searchResults);
             }
             catch (Exception ex)
