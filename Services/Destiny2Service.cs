@@ -1,5 +1,6 @@
 ﻿using API.Clients.Abstract;
 using API.Models.Constants;
+using API.Models.DestinyApi;
 using API.Models.DestinyApi.Activity;
 using API.Models.DestinyApi.Character;
 using API.Models.Responses;
@@ -17,17 +18,18 @@ namespace API.Services
 
         public async Task<SearchResponse> SearchForPlayer(string playerName)
         {
-            var hasMore = true;
             var page = 0;
+            var response = await _client.PerformSearch(playerName, page);
+            var hasMore = response.Response.HasMore;
             while (hasMore)
             {
-                var searchResponse = await _client.PerformSearch(playerName, page);
-                hasMore = searchResponse.Response.HasMore;
                 page++;
+                var searchResponse = await _client.PerformSearch(playerName, page);
+                response.Response.SearchResults.AddRange(searchResponse.Response.SearchResults);
+                hasMore = searchResponse.Response.HasMore;
             }
-            var results = await _client.PerformSearch(playerName, 0);
 
-            var filteredMemberships = results.Response.SearchResults
+            var filteredMemberships = response.Response.SearchResults
                 .SelectMany(r => r.DestinyMemberships
                     .Where(m => m.ApplicableMembershipTypes != null && m.ApplicableMembershipTypes.Contains(m.MembershipType))
                     .Select(m => new
