@@ -27,9 +27,9 @@ namespace API.Clients
             _httpClient.BaseAddress = new Uri("https://www.bungie.net/Platform/");
             _httpClient.DefaultRequestHeaders.Add("X-API-Key", _apiKey);
         }
-        public async Task<DestinyApiResponse<SearchResponse>> PerformSearch(string playerName)
+        public async Task<DestinyApiResponse<SearchResponse>> PerformSearch(string playerName, int page)
         {
-            var url = $"User/Search/Prefix/{Uri.EscapeDataString(playerName)}/0";
+            var url = $"User/Search/Prefix/{Uri.EscapeDataString(playerName)}/{page}";
             var response = await _httpClient.GetAsync(url);
 
             if (response.IsSuccessStatusCode)

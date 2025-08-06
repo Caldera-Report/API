@@ -17,7 +17,15 @@ namespace API.Services
 
         public async Task<SearchResponse> SearchForPlayer(string playerName)
         {
-            var results = await _client.PerformSearch(playerName);
+            var hasMore = true;
+            var page = 0;
+            while (hasMore)
+            {
+                var searchResponse = await _client.PerformSearch(playerName, page);
+                hasMore = searchResponse.Response.HasMore;
+                page++;
+            }
+            var results = await _client.PerformSearch(playerName, 0);
 
             var filteredMemberships = results.Response.SearchResults
                 .SelectMany(r => r.DestinyMemberships

@@ -6,5 +6,9 @@ namespace API.Models.DestinyApi.Search
     {
         [JsonPropertyName("searchResults")]
         public required List<SearchResult> SearchResults { get; set; }
+        [JsonPropertyName("page")]
+        public required int Page { get; set; }
+        [JsonPropertyName("hasMore")]
+        public required bool HasMore { get; set; }
     }
 }

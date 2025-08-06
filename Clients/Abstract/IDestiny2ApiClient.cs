@@ -7,7 +7,7 @@ namespace API.Clients.Abstract
 {
     public interface IDestiny2ApiClient
     {
-        public Task<DestinyApiResponse<SearchResponse>> PerformSearch(string playerName);
+        public Task<DestinyApiResponse<SearchResponse>> PerformSearch(string playerName, int page);
         public Task<DestinyApiResponse<CharacterResponse>> GetCharactersForPlayer(string membershipId, int membershipType);
         public Task<DestinyApiResponse<ActivityResponse>> GetActivityAggregateForCharacter(string membershipId, int membershipType, string characterId);
     }
