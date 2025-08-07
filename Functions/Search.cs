@@ -41,6 +41,7 @@ namespace API.Functions
             {
                 _logger.LogError(ex, $"Error searching for player: {playerName}");
                 _telemetryClient.TrackException(ex);
+                operation.Telemetry.Success = false;
                 return new StatusCodeResult(500);
             }
         }

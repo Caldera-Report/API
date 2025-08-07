@@ -41,6 +41,7 @@ public class Player
         {
             _logger.LogError(ex, $"Error getting stats for player: {membershipId}");
             _telemetryClient.TrackException(ex);
+            operation.Telemetry.Success = false;
             return new StatusCodeResult(500);
         }
     }
