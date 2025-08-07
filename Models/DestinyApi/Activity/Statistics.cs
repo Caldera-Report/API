@@ -9,6 +9,6 @@ namespace API.Models.DestinyApi.Activity
         [JsonPropertyName("basic")]
         public required BasicStats Basic { get; set; }
         [JsonPropertyName("activityId")]
-        public string? ActivityId { get; set; }
+        public string? ActivityId { get; set; } 
     }
 }

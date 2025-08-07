@@ -88,18 +88,9 @@ namespace API.Services
                 DisplayNameCode = bungieId
             };
 
-            var tasks = new List<Task<DestinyApiResponse<List<SearchByBungieNameResult>>>>();
-            foreach (var membershipTypeId in DestinyConstants.MembershipTypeIds)
-            {
-                tasks.Add(_client.PerformSearchByBungieName(player, membershipTypeId));
-            }
+            var response = _client.PerformSearchByBungieName(player, -1);
 
-            var responses = await Task.WhenAll(tasks);
-
-            var bungieNameResults = responses.Where(r => r.Response.Count() > 0)
-                .Select(r => r.Response.First())
-                .Where(r => r.applicableMembershipTypes.Count() > 0);
-            var results = bungieNameResults
+            var results = response.Result.Response
                 .Select(r => new DestinySearchResult
                 {
                     BungieGlobalDisplayName = r.bungieGlobalDisplayName,
