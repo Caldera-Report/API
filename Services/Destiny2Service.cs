@@ -1,28 +1,37 @@
 ﻿using API.Clients.Abstract;
 using API.Models.Constants;
 using API.Models.DestinyApi;
-using SearchByPrefix = API.Models.DestinyApi.Search.SearchByPrefix;
-using SearchPlayerByName = API.Models.DestinyApi.Search.SearchPlayerByName;
-using DestinySearchResult = API.Models.DestinyApi.Search.SearchResult;
-using SearchByBungieNameResult = API.Models.DestinyApi.Search.SearchByBungieNameResult;
-using DestinyMembership = API.Models.DestinyApi.Search.DestinyMembership;
 using API.Models.DestinyApi.Activity;
 using API.Models.DestinyApi.Character;
 using API.Models.Responses;
 using API.Services.Abstract;
+using Microsoft.Extensions.Caching.Distributed;
+using System.Text.Json;
+using DestinyMembership = API.Models.DestinyApi.Search.DestinyMembership;
+using DestinySearchResult = API.Models.DestinyApi.Search.SearchResult;
+using SearchByBungieNameResult = API.Models.DestinyApi.Search.SearchByBungieNameResult;
+using SearchByPrefix = API.Models.DestinyApi.Search.SearchByPrefix;
+using SearchPlayerByName = API.Models.DestinyApi.Search.SearchPlayerByName;
 
 namespace API.Services
 {
     public class Destiny2Service : IDestiny2Service
     {
-        private IDestiny2ApiClient _client;
-        public Destiny2Service(IDestiny2ApiClient client)
+        private readonly IDestiny2ApiClient _client;
+        private readonly IDistributedCache _cache;
+        public Destiny2Service(IDestiny2ApiClient client, IDistributedCache cache)
         {
             _client = client;
+            _cache = cache; 
         }
 
         public async Task<SearchResponse> SearchForPlayer(string playerName)
         {
+            var cacheKey = $"Search:{playerName}";
+            var cached = await _cache.GetStringAsync(cacheKey);
+            if (cached != null)
+                return JsonSerializer.Deserialize<SearchResponse>(cached);
+
             var hasBungieId = playerName.Length > 5 && playerName[^5] == '#';
 
             var response = hasBungieId ? 
@@ -60,6 +69,11 @@ namespace API.Services
                 Results = grouped
             };
 
+            await _cache.SetStringAsync(cacheKey, JsonSerializer.Serialize(result), new DistributedCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(14)
+            });
+
             return result;
         }
 
@@ -74,13 +88,15 @@ namespace API.Services
                 DisplayNameCode = bungieId
             };
 
-            var tasks = new List<DestinyApiResponse<List<SearchByBungieNameResult>>>();
+            var tasks = new List<Task<DestinyApiResponse<List<SearchByBungieNameResult>>>>();
             foreach (var membershipTypeId in DestinyConstants.MembershipTypeIds)
             {
-                tasks.Add( await _client.PerformSearchByBungieName(player, membershipTypeId));
+                tasks.Add(_client.PerformSearchByBungieName(player, membershipTypeId));
             }
 
-            var bungieNameResults = tasks.Where(r => r.Response.Count() > 0)
+            var responses = await Task.WhenAll(tasks);
+
+            var bungieNameResults = responses.Where(r => r.Response.Count() > 0)
                 .Select(r => r.Response.First())
                 .Where(r => r.applicableMembershipTypes.Count() > 0);
             var results = bungieNameResults
@@ -98,7 +114,8 @@ namespace API.Services
                             MembershipId = r.membershipId
                         }
                     }
-                });
+                }).ToList();
+
             return results;
         }
 
@@ -122,6 +139,11 @@ namespace API.Services
 
         public async Task<StatisticsResponse> GetStatisticsForPlayer(string membershipId, int membershipType)
         {
+            var cacheKey = $"GetStats:{membershipType}+{membershipId}";
+            var cached = await _cache.GetStringAsync(cacheKey);
+            if (cached != null)
+                return JsonSerializer.Deserialize<StatisticsResponse>(cached);
+
             var characters = await GetCharactersForPlayer(membershipId, membershipType);
 
             var activityTasks = new List<Task<IEnumerable<Activity>>>();
@@ -173,6 +195,11 @@ namespace API.Services
                         .Where(a => a.ActivityHash == DestinyConstants.Encore && a.Values["fastestCompletionMsForActivity"].Basic.Value != 0)
                         .Min(a => a.Values["fastestCompletionMsForActivity"].Basic.DisplayValue),
             };
+
+            await _cache.SetStringAsync(cacheKey, JsonSerializer.Serialize(stats), new DistributedCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5)
+            });
 
             return stats;
         }

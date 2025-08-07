@@ -35,6 +35,11 @@ builder.Services.AddOptions<Destiny2Options>()
         configuration.GetSection("Destiny2Api").Bind(settings);
     });
 
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    options.Configuration = builder.Configuration["RedisConnectionString"];
+});
+
 builder.Services.AddHttpClient<IDestiny2ApiClient, Destiny2ApiClient>();
 builder.Services.AddScoped<IDestiny2Service, Destiny2Service>();
 
