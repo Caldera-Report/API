@@ -1,17 +1,9 @@
 ﻿using API.Clients.Abstract;
-using API.Models.Constants;
-using API.Models.DestinyApi;
-using API.Models.DestinyApi.Activity;
-using API.Models.DestinyApi.Character;
-using API.Models.Responses;
 using API.Services.Abstract;
+using Classes.DestinyApi;
+using Classes.DTO;
 using Microsoft.Extensions.Caching.Distributed;
 using System.Text.Json;
-using DestinyMembership = API.Models.DestinyApi.Search.DestinyMembership;
-using DestinySearchResult = API.Models.DestinyApi.Search.SearchResult;
-using SearchByBungieNameResult = API.Models.DestinyApi.Search.SearchByBungieNameResult;
-using SearchByPrefix = API.Models.DestinyApi.Search.SearchByPrefix;
-using SearchPlayerByName = API.Models.DestinyApi.Search.SearchPlayerByName;
 
 namespace API.Services
 {
@@ -39,34 +31,18 @@ namespace API.Services
                 await SearchByPrefix(playerName);
 
             var filteredMemberships = response
-                .SelectMany(r => r.DestinyMemberships
-                    .Where(m => m.ApplicableMembershipTypes != null && m.ApplicableMembershipTypes.Contains(m.MembershipType))
-                    .Select(m => new
-                    {
-                        Membership = m,
-                        r.BungieGlobalDisplayName,
-                        r.BungieGlobalDisplayNameCode
-                    }))
-                .ToList();
-
-            var grouped = filteredMemberships
-                .GroupBy(x => x.Membership.MembershipId)
-                .Select(g =>
-                {
-                    var first = g.First();
-                    return new SearchResult
-                    {
-                        DisplayName = first.BungieGlobalDisplayName,
-                        DisplayNameCode = first.BungieGlobalDisplayNameCode,
-                        DestinyMembershipId = first.Membership.MembershipId,
-                        MembershipType = first.Membership.MembershipType
-                    };
-                })
-                .ToList();
+                    .Where(m => m.applicableMembershipTypes.Count > 0)
+                    .Select(m => new SearchResult
+                    { 
+                        DestinyMembershipId = m.membershipId.ToString(),
+                        MembershipType = m.membershipType,
+                        DisplayName = m.bungieGlobalDisplayName,
+                        DisplayNameCode = m.bungieGlobalDisplayNameCode
+                    });
 
             var result = new SearchResponse
             {
-                Results = grouped
+                Results = filteredMemberships.ToList()
             };
 
             await _cache.SetStringAsync(cacheKey, JsonSerializer.Serialize(result), new DistributedCacheEntryOptions
@@ -77,55 +53,42 @@ namespace API.Services
             return result;
         }
 
-        public async Task<IEnumerable<DestinySearchResult>> SearchByBungieName(string playerName)
+        public async Task<IEnumerable<UserInfoCard>> SearchByBungieName(string playerName)
         {
             var bungieId = int.Parse(playerName[^4..]);
             playerName = playerName[..^5];
 
-            var player = new SearchPlayerByName
+            var player = new ExactSearchRequest
             {
-                DisplayName = playerName,
-                DisplayNameCode = bungieId
+                displayName = playerName,
+                displayNameCode = bungieId
             };
 
             var response = _client.PerformSearchByBungieName(player, -1);
 
-            var results = response.Result.Response
-                .Select(r => new DestinySearchResult
-                {
-                    BungieGlobalDisplayName = r.bungieGlobalDisplayName,
-                    BungieGlobalDisplayNameCode = r.bungieGlobalDisplayNameCode,
-                    DestinyMemberships = new List<DestinyMembership>
-                    {
-                        new DestinyMembership
-                        {
-                            ApplicableMembershipTypes = r.applicableMembershipTypes.ToList(),
-                            IsPublic = r.isPublic,
-                            MembershipType = r.membershipType,
-                            MembershipId = r.membershipId
-                        }
-                    }
-                }).ToList();
+            var results = response.Result.Response;
 
             return results;
         }
 
-        public async Task<IEnumerable<DestinySearchResult>> SearchByPrefix(string playerName)
+        public async Task<IEnumerable<UserInfoCard>> SearchByPrefix(string playerName)
         {
             var page = 0;
-            var player = new SearchByPrefix
+            var player = new UserSearchPrefixRequest
             {
-                DisplayNamePrefix = playerName
+                displayNamePrefix = playerName
             };
             var response = await _client.PerformSearchByPrefix(player, page);
-            var hasMore = response.Response.HasMore;
+            var hasMore = response.Response.hasMore;
             while (hasMore)
             {
                 page++;
                 var nextResponse = await _client.PerformSearchByPrefix(player, page);
-                response.Response.SearchResults.AddRange(nextResponse.Response.SearchResults);
+                response.Response.searchResults.AddRange(nextResponse.Response.searchResults);
+                hasMore = nextResponse.Response.hasMore;
             }
-            return response.Response.SearchResults;
+
+            return response.Response.searchResults.SelectMany(r => r.destinyMemberships);
         }
 
         public async Task<StatisticsResponse> GetStatisticsForPlayer(string membershipId, int membershipType)
@@ -137,14 +100,14 @@ namespace API.Services
 
             var characters = await GetCharactersForPlayer(membershipId, membershipType);
 
-            var activityTasks = new List<Task<IEnumerable<Activity>>>();
+            var activityTasks = new List<Task<IEnumerable<DestinyAggregateActivityStats>>>();
 
-            async Task<IEnumerable<Activity>> GetRelevantActivityDataForCharacter(int membershipType, string membershipId, string characterId)
+            async Task<IEnumerable<DestinyAggregateActivityStats>> GetRelevantActivityDataForCharacter(int membershipType, string membershipId, string characterId)
             {
                 try
                 {
                     var activityResponse = await _client.GetActivityAggregateForCharacter(membershipId, membershipType, characterId);
-                    return activityResponse.Response.Activities.Where(a => DestinyConstants.AllActivities.Contains(a.ActivityHash));
+                    return activityResponse.Response.activities.Where(a => DestinyApiConstants.AllActivities.Contains(a.activityHash));
                 }
                 catch (Exception ex)
                 {
@@ -162,29 +125,29 @@ namespace API.Services
             var stats = new StatisticsResponse
             {
                 CalderaCompletions = activityResults.SelectMany(a => a)
-                        .Where(a => a.ActivityHash == DestinyConstants.Caldera && a.Values["fastestCompletionMsForActivity"].Basic.Value != 0)
-                        .Sum(a => (int)a.Values["activityCompletions"].Basic.Value),
+                        .Where(a => a.activityHash == DestinyApiConstants.Caldera && a.values["fastestCompletionMsForActivity"].basic.value != 0)
+                        .Sum(a => (int)a.values["activityCompletions"].basic.value),
                 CalderaFastestCompletion = activityResults.SelectMany(a => a)
-                        .Where(a => a.ActivityHash == DestinyConstants.Caldera && a.Values["fastestCompletionMsForActivity"].Basic.Value != 0)
-                        .Min(a => a.Values["fastestCompletionMsForActivity"].Basic.DisplayValue),
+                        .Where(a => a.activityHash == DestinyApiConstants.Caldera && a.values["fastestCompletionMsForActivity"].basic.value != 0)
+                        .Min(a => a.values["fastestCompletionMsForActivity"].basic.displayValue),
                 K1Completions = activityResults.SelectMany(a => a)
-                        .Where(a => DestinyConstants.K1.Contains(a.ActivityHash) && a.Values["fastestCompletionMsForActivity"].Basic.Value != 0)
-                        .Sum(a => (int)a.Values["activityCompletions"].Basic.Value),
+                        .Where(a => DestinyApiConstants.K1.Contains(a.activityHash) && a.values["fastestCompletionMsForActivity"].basic.value != 0)
+                        .Sum(a => (int)a.values["activityCompletions"].basic.value),
                 K1FastestCompletion = activityResults.SelectMany(a => a)
-                        .Where(a => DestinyConstants.K1.Contains(a.ActivityHash) && a.Values["fastestCompletionMsForActivity"].Basic.Value != 0)
-                        .Min(a => a.Values["fastestCompletionMsForActivity"].Basic.DisplayValue),
+                        .Where(a => DestinyApiConstants.K1.Contains(a.activityHash) && a.values["fastestCompletionMsForActivity"].basic.value != 0)
+                        .Min(a => a.values["fastestCompletionMsForActivity"].basic.displayValue),
                 KellsFallCompletions = activityResults.SelectMany(a => a)
-                        .Where(a => a.ActivityHash == DestinyConstants.KellsFall && a.Values["fastestCompletionMsForActivity"].Basic.Value != 0)
-                        .Sum(a => (int)a.Values["activityCompletions"].Basic.Value),
+                        .Where(a => a.activityHash == DestinyApiConstants.KellsFall && a.values["fastestCompletionMsForActivity"].basic.value != 0)
+                        .Sum(a => (int)a.values["activityCompletions"].basic.value),
                 KellsFallFastestCompletion = activityResults.SelectMany(a => a)
-                        .Where(a => a.ActivityHash == DestinyConstants.KellsFall && a.Values["fastestCompletionMsForActivity"].Basic.Value != 0)
-                        .Min(a => a.Values["fastestCompletionMsForActivity"].Basic.DisplayValue),
+                        .Where(a => a.activityHash == DestinyApiConstants.KellsFall && a.values["fastestCompletionMsForActivity"].basic.value != 0)
+                        .Min(a => a.values["fastestCompletionMsForActivity"].basic.displayValue),
                 EncoreCompletions = activityResults.SelectMany(a => a)
-                        .Where(a => a.ActivityHash == DestinyConstants.Encore && a.Values["fastestCompletionMsForActivity"].Basic.Value != 0)
-                        .Sum(a => (int)a.Values["activityCompletions"].Basic.Value),
+                        .Where(a => a.activityHash == DestinyApiConstants.Encore && a.values["fastestCompletionMsForActivity"].basic.value != 0)
+                        .Sum(a => (int)a.values["activityCompletions"].basic.value),
                 EncoreFastestCompletion = activityResults.SelectMany(a => a)
-                        .Where(a => a.ActivityHash == DestinyConstants.Encore && a.Values["fastestCompletionMsForActivity"].Basic.Value != 0)
-                        .Min(a => a.Values["fastestCompletionMsForActivity"].Basic.DisplayValue),
+                        .Where(a => a.activityHash == DestinyApiConstants.Encore && a.values["fastestCompletionMsForActivity"].basic.value != 0)
+                        .Min(a => a.values["fastestCompletionMsForActivity"].basic.displayValue),
             };
 
             await _cache.SetStringAsync(cacheKey, JsonSerializer.Serialize(stats), new DistributedCacheEntryOptions
@@ -195,10 +158,10 @@ namespace API.Services
             return stats;
         }
 
-        public async Task<Dictionary<string, Character>> GetCharactersForPlayer(string membershipId, int membershipType)
+        public async Task<Dictionary<string, DictionaryComponentResponseOfint64AndDestinyCharacterComponent>> GetCharactersForPlayer(string membershipId, int membershipType)
         {
             var characters = await _client.GetCharactersForPlayer(membershipId, membershipType);
-            return characters.Response.CharacterData.Data;
+            return characters.Response.characters;
         }
     }
 

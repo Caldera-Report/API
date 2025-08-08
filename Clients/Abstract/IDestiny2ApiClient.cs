@@ -1,15 +1,12 @@
-﻿using API.Models.DestinyApi;
-using API.Models.DestinyApi.Activity;
-using API.Models.DestinyApi.Character;
-using API.Models.DestinyApi.Search;
+﻿using Classes.DestinyApi;
 
 namespace API.Clients.Abstract
 {
     public interface IDestiny2ApiClient
     {
-        public Task<DestinyApiResponse<SearchResponse>> PerformSearchByPrefix(SearchByPrefix player, int page);
-        public Task<DestinyApiResponse<List<SearchByBungieNameResult>>> PerformSearchByBungieName(SearchPlayerByName player, int membershipTypeId);
-        public Task<DestinyApiResponse<CharacterResponse>> GetCharactersForPlayer(string membershipId, int membershipType);
-        public Task<DestinyApiResponse<ActivityResponse>> GetActivityAggregateForCharacter(string membershipId, int membershipType, string characterId);
+        public Task<DestinyApiResponse<UserSearchPrefixResponse>> PerformSearchByPrefix(UserSearchPrefixRequest player, int page);
+        public Task<DestinyApiResponse<List<UserInfoCard>>> PerformSearchByBungieName(ExactSearchRequest player, int membershipTypeId);
+        public Task<DestinyApiResponse<DestinyProfileResponse>> GetCharactersForPlayer(string membershipId, int membershipType);
+        public Task<DestinyApiResponse<DestinyAggregateActivityResults>> GetActivityAggregateForCharacter(string membershipId, int membershipType, string characterId);
     }
 }

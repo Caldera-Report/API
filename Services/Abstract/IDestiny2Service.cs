@@ -1,5 +1,5 @@
-﻿using API.Models.DestinyApi.Character;
-using API.Models.Responses;
+﻿using Classes.DTO;
+using Classes.DestinyApi;
 
 namespace API.Services.Abstract
 {
@@ -7,6 +7,6 @@ namespace API.Services.Abstract
     {
         public Task<SearchResponse> SearchForPlayer(string playerName);
         public Task<StatisticsResponse> GetStatisticsForPlayer(string membershipId, int membershipType);
-        public Task<Dictionary<string, Character>> GetCharactersForPlayer(string membershipId, int membershipType);
+        public Task<Dictionary<string, DictionaryComponentResponseOfint64AndDestinyCharacterComponent>> GetCharactersForPlayer(string membershipId, int membershipType);
     }
 }

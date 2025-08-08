@@ -1,9 +1,6 @@
 ﻿using API.Clients.Abstract;
-using API.Models.DestinyApi;
-using API.Models.DestinyApi.Activity;
-using API.Models.DestinyApi.Character;
-using API.Models.DestinyApi.Search;
 using API.Models.Options;
+using Classes.DestinyApi;
 using Microsoft.Extensions.Options;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -27,7 +24,7 @@ namespace API.Clients
             _httpClient.BaseAddress = new Uri("https://www.bungie.net/Platform/");
             _httpClient.DefaultRequestHeaders.Add("X-API-Key", _apiKey);
         }
-        public async Task<DestinyApiResponse<SearchResponse>> PerformSearchByPrefix(SearchByPrefix name, int page)
+        public async Task<DestinyApiResponse<UserSearchPrefixResponse>> PerformSearchByPrefix(UserSearchPrefixRequest name, int page)
         {
             var url = $"User/Search/GlobalName/{page}";
             var response = await _httpClient.PostAsync(url, JsonContent.Create(name));
@@ -35,7 +32,7 @@ namespace API.Clients
             if (response.IsSuccessStatusCode)
             {
                 var content = await response.Content.ReadAsStringAsync();
-                return JsonSerializer.Deserialize<DestinyApiResponse<SearchResponse>>(content)
+                return JsonSerializer.Deserialize<DestinyApiResponse<UserSearchPrefixResponse>>(content)
                     ?? throw new InvalidOperationException("Failed to deserialize response.");
             }
             else
@@ -44,14 +41,14 @@ namespace API.Clients
             }
         }
 
-        public async Task<DestinyApiResponse<List<SearchByBungieNameResult>>> PerformSearchByBungieName(SearchPlayerByName player, int membershipTypeId)
+        public async Task<DestinyApiResponse<List<UserInfoCard>>> PerformSearchByBungieName(ExactSearchRequest player, int membershipTypeId)
         {
             var url = $"Destiny2/SearchDestinyPlayerByBungieName/{membershipTypeId}/";
             var response = await _httpClient.PostAsync(url, JsonContent.Create(player));
             if (response.IsSuccessStatusCode)
             {
                 var content = await response.Content.ReadAsStringAsync();
-                return JsonSerializer.Deserialize<DestinyApiResponse<List<SearchByBungieNameResult>>>(content)
+                return JsonSerializer.Deserialize<DestinyApiResponse<List<UserInfoCard>>>(content)
                     ?? throw new InvalidOperationException("Failed to deserialize response.");
             }
             else
@@ -60,7 +57,7 @@ namespace API.Clients
             }
         }
 
-        public async Task<DestinyApiResponse<CharacterResponse>> GetCharactersForPlayer(string membershipId, int membershipType)
+        public async Task<DestinyApiResponse<DestinyProfileResponse>> GetCharactersForPlayer(string membershipId, int membershipType)
         {
             var url = $"Destiny2/{membershipType}/Profile/{membershipId}?components=Characters";
             var response = await _httpClient.GetAsync(url);
@@ -68,7 +65,7 @@ namespace API.Clients
             if (response.IsSuccessStatusCode)
             {
                 var content = await response.Content.ReadAsStringAsync();
-                return JsonSerializer.Deserialize<DestinyApiResponse<CharacterResponse>>(content)
+                return JsonSerializer.Deserialize<DestinyApiResponse<DestinyProfileResponse>>(content)
                     ?? throw new InvalidOperationException("Failed to deserialize response.");
             }
             else
@@ -77,7 +74,7 @@ namespace API.Clients
             }
         }
 
-        public async Task<DestinyApiResponse<ActivityResponse>> GetActivityAggregateForCharacter(string membershipId, int membershipType, string characterId)
+        public async Task<DestinyApiResponse<DestinyAggregateActivityResults>> GetActivityAggregateForCharacter(string membershipId, int membershipType, string characterId)
         {
             var url = $"Destiny2/{membershipType}/Account/{membershipId}/Character/{characterId}/Stats/AggregateActivityStats";
             var response = await _httpClient.GetAsync(url);
@@ -85,7 +82,7 @@ namespace API.Clients
             if (response.IsSuccessStatusCode)
             {
                 var content = await response.Content.ReadAsStringAsync();
-                return JsonSerializer.Deserialize<DestinyApiResponse<ActivityResponse>>(content)
+                return JsonSerializer.Deserialize<DestinyApiResponse<DestinyAggregateActivityResults>>(content)
                     ?? throw new InvalidOperationException("Failed to deserialize response.");
             }
             else
