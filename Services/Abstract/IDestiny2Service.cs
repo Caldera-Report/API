@@ -7,6 +7,6 @@ namespace API.Services.Abstract
     {
         public Task<SearchResponse> SearchForPlayer(string playerName);
         public Task<StatisticsResponse> GetStatisticsForPlayer(string membershipId, int membershipType);
-        public Task<Dictionary<string, DictionaryComponentResponseOfint64AndDestinyCharacterComponent>> GetCharactersForPlayer(string membershipId, int membershipType);
+        public Task<Dictionary<string, DestinyCharacterComponent>> GetCharactersForPlayer(string membershipId, int membershipType);
     }
 }

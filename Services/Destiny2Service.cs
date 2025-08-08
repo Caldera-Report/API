@@ -64,9 +64,9 @@ namespace API.Services
                 displayNameCode = bungieId
             };
 
-            var response = _client.PerformSearchByBungieName(player, -1);
+            var response = await _client.PerformSearchByBungieName(player, -1);
 
-            var results = response.Result.Response;
+            var results = response.Response;
 
             return results;
         }
@@ -158,10 +158,10 @@ namespace API.Services
             return stats;
         }
 
-        public async Task<Dictionary<string, DictionaryComponentResponseOfint64AndDestinyCharacterComponent>> GetCharactersForPlayer(string membershipId, int membershipType)
+        public async Task<Dictionary<string, DestinyCharacterComponent>> GetCharactersForPlayer(string membershipId, int membershipType)
         {
             var characters = await _client.GetCharactersForPlayer(membershipId, membershipType);
-            return characters.Response.characters;
+            return characters.Response.characters.data;
         }
     }
 
