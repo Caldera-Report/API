@@ -117,6 +117,8 @@ namespace API.Services
 
             foreach (var character in characters)
             {
+                if (character.Value.dateLastPlayed > DateTime.MinValue)
+                    continue;
                 activityTasks.Add(GetRelevantActivityDataForCharacter(membershipType, membershipId, character.Key));
             }
 
