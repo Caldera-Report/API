@@ -1,6 +1,6 @@
 using API.Clients;
 using API.Clients.Abstract;
-using API.Models.Options;
+using API.Configuration;
 using API.Services;
 using API.Services.Abstract;
 using Microsoft.Azure.Functions.Worker;

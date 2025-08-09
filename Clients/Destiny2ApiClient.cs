@@ -1,5 +1,5 @@
 ﻿using API.Clients.Abstract;
-using API.Models.Options;
+using API.Configuration;
 using Classes.DestinyApi;
 using Microsoft.Extensions.Options;
 using System.Net.Http.Json;
