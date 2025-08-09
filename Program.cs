@@ -1,32 +1,35 @@
 using API.Clients;
 using API.Clients.Abstract;
 using API.Configuration;
+using API.Data;
 using API.Services;
 using API.Services.Abstract;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Builder;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging.Abstractions;
 
 var builder = FunctionsApplication.CreateBuilder(args);
 
 builder.ConfigureFunctionsWebApplication();
 
 
-//builder.Services.AddDbContextPool<AppDbContext>(options =>
-//{
-//    options.UseNpgsql(builder.Configuration.GetConnectionString("PostgreSqlConnectionString"), npgsqlOptions =>
-//    {
-//        npgsqlOptions.EnableRetryOnFailure(
-//            maxRetryCount: 3,
-//            maxRetryDelay: TimeSpan.FromSeconds(30),
-//            errorCodesToAdd: null);
-//    });
+builder.Services.AddDbContextPool<AppDbContext>(options =>
+{
+    options.UseNpgsql(builder.Configuration.GetConnectionString("PostgreSqlConnectionString"), npgsqlOptions =>
+    {
+        npgsqlOptions.EnableRetryOnFailure(
+            maxRetryCount: 3,
+            maxRetryDelay: TimeSpan.FromSeconds(30),
+            errorCodesToAdd: null);
+    });
 
-//    options.EnableServiceProviderCaching();
-//    options.EnableSensitiveDataLogging(false);
-//}, poolSize: 64);
+    options.EnableServiceProviderCaching();
+    options.EnableSensitiveDataLogging(true);
+}, poolSize: 64);
 
 
 builder.Services.AddOptions<Destiny2Options>()

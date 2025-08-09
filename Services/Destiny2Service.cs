@@ -1,5 +1,7 @@
 ﻿using API.Clients.Abstract;
+using API.Data;
 using API.Services.Abstract;
+using Classes.DB;
 using Classes.DestinyApi;
 using Classes.DTO;
 using Microsoft.Extensions.Caching.Distributed;
@@ -11,19 +13,16 @@ namespace API.Services
     {
         private readonly IDestiny2ApiClient _client;
         private readonly IDistributedCache _cache;
-        public Destiny2Service(IDestiny2ApiClient client, IDistributedCache cache)
+        private readonly AppDbContext _context;
+        public Destiny2Service(IDestiny2ApiClient client, IDistributedCache cache, AppDbContext context)
         {
             _client = client;
             _cache = cache; 
+            _context = context;
         }
 
         public async Task<SearchResponse> SearchForPlayer(string playerName)
         {
-            var cacheKey = $"Search:{playerName}";
-            var cached = await _cache.GetStringAsync(cacheKey);
-            if (cached != null)
-                return JsonSerializer.Deserialize<SearchResponse>(cached);
-
             var hasBungieId = playerName.Length > 5 && playerName[^5] == '#';
 
             var response = hasBungieId ? 
@@ -38,19 +37,59 @@ namespace API.Services
                         MembershipType = m.membershipType,
                         DisplayName = m.bungieGlobalDisplayName,
                         DisplayNameCode = m.bungieGlobalDisplayNameCode
-                    });
+                    })
+                    .DistinctBy(r => r.DestinyMembershipId); //because apparently sometimes there are dupes
 
             var result = new SearchResponse
             {
                 Results = filteredMemberships.ToList()
             };
 
-            await _cache.SetStringAsync(cacheKey, JsonSerializer.Serialize(result), new DistributedCacheEntryOptions
-            {
-                AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(14)
-            });
+            await AddSearchResultsToDb(result);
 
             return result;
+        }
+
+        public async Task AddSearchResultsToDb(SearchResponse result)
+        {
+            var membershipIds = result.Results
+                .Select(m => long.Parse(m.DestinyMembershipId))
+                .ToList();
+            var membershipTypes = result.Results
+                .Select(m => m.MembershipType)
+                .ToList();
+
+            var existingPlayers = _context.Players
+                .Where(p => membershipIds.Contains(p.Id) && membershipTypes.Contains(p.MembershipType))
+                .Select(p => new { p.Id, p.MembershipType })
+                .ToList();
+
+            var existingPlayerKeys = new HashSet<(long, int)>(
+                existingPlayers.Select(p => (p.Id, p.MembershipType))
+            );
+
+            var newPlayers = new List<Player>();
+            foreach (var membership in result.Results.Distinct())
+            {
+                var id = long.Parse(membership.DestinyMembershipId);
+                var type = membership.MembershipType;
+                if (!existingPlayerKeys.Contains((id, type)))
+                {
+                    newPlayers.Add(new Player
+                    {
+                        Id = id,
+                        MembershipType = type,
+                        DisplayName = membership.DisplayName
+                    });
+                }
+            }
+
+            if (newPlayers.Count > 0)
+            {
+                _context.Players.AddRange(newPlayers);
+            }
+
+            await _context.SaveChangesAsync();
         }
 
         public async Task<IEnumerable<UserInfoCard>> SearchByBungieName(string playerName)
