@@ -107,6 +107,8 @@ namespace API.Services
                 try
                 {
                     var activityResponse = await _client.GetActivityAggregateForCharacter(membershipId, membershipType, characterId);
+                    if (activityResponse.Response.activities == null)
+                        return Enumerable.Empty<DestinyAggregateActivityStats>();
                     return activityResponse.Response.activities.Where(a => DestinyApiConstants.AllActivities.Contains(a.activityHash));
                 }
                 catch (Exception ex)
