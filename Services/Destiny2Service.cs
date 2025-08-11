@@ -79,7 +79,8 @@ namespace API.Services
                     {
                         Id = id,
                         MembershipType = type,
-                        DisplayName = membership.DisplayName
+                        DisplayName = membership.DisplayName,
+                        LastUpdateStatus = "completed"
                     });
                 }
             }
