@@ -80,7 +80,8 @@ namespace API.Services
                         Id = id,
                         MembershipType = type,
                         DisplayName = membership.DisplayName,
-                        LastUpdateStatus = "completed"
+                        DisplayNameCode = membership.DisplayNameCode,
+                        LastUpdateStatus = "Completed"
                     });
                 }
             }
