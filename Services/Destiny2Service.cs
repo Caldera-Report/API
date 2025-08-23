@@ -209,7 +209,17 @@ namespace API.Services
 
         public async Task<List<Player>> GetAllPlayers()
         {
-            var players = _context.Players.ToList();
+            var players = _context.Players.Select(
+                players => new Player
+                {
+                    Id = players.Id,
+                    MembershipType = players.MembershipType,
+                    DisplayName = players.DisplayName,
+                    DisplayNameCode = players.DisplayNameCode,
+                    LastUpdateStatus = players.LastUpdateStatus
+                }
+            )
+            .ToList();
             if (players.Count == 0)
                 return null;
             return players;
