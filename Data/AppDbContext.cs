@@ -53,19 +53,48 @@ namespace API.Data
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            modelBuilder.Entity<Player>()
-                .Property(p => p.Id)
-                .ValueGeneratedNever();
+            modelBuilder.Entity<Player>(entity =>
+            {
+                entity.Property(p => p.Id).ValueGeneratedNever();
+
+                entity.HasMany(p => p.ActivityReports)
+                      .WithOne(ar => ar.Player)
+                      .HasForeignKey(ar => ar.PlayerId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(p => p.LastActivityReport)
+                      .WithOne()
+                      .HasForeignKey<Player>(p => p.LastPlayedActivityId)
+                      .OnDelete(DeleteBehavior.SetNull);
+            });
+
             modelBuilder.Entity<Activity>()
                 .Property(a => a.Id)
                 .ValueGeneratedNever();
+
             modelBuilder.Entity<ActivityType>()
                 .Property(at => at.Id)
                 .ValueGeneratedNever();
-            modelBuilder.Entity<ActivityReport>()
-                .HasIndex(ar => ar.InstanceId);
+
+            modelBuilder.Entity<ActivityReport>(entity =>
+            {
+                entity.HasIndex(ar => ar.InstanceId);
+
+                entity.HasIndex(ar => new { ar.ActivityId, ar.PlayerId })
+                      .HasDatabaseName("IX_ActivityReport_Activity_Player");
+
+                entity.HasIndex(ar => new { ar.ActivityId, ar.PlayerId, ar.Duration })
+                      .HasFilter("\"Completed\" = TRUE")
+                      .HasDatabaseName("IX_ActivityReport_Completed_Fastest");
+
+                entity.HasIndex(ar => new { ar.ActivityId, ar.PlayerId, ar.Completed })
+                      .IncludeProperties(ar => new { ar.Duration })
+                      .HasDatabaseName("IX_ActivityReport_Activity_Player_Completed_InclDuration");
+            });
+
             modelBuilder.Entity<ActivityHashMapping>()
                 .HasKey(m => m.SourceHash);
+
             modelBuilder.Entity<ActivityHashMapping>()
                 .HasOne(m => m.CanonicalActivity)
                 .WithMany()
