@@ -206,6 +206,14 @@ namespace API.Services
             var characters = await _client.GetCharactersForPlayer(membershipId, membershipType);
             return characters.Response.characters.data;
         }
+
+        public async Task<List<Player>> GetAllPlayers()
+        {
+            var players = _context.Players.ToList();
+            if (players.Count == 0)
+                return null;
+            return players;
+        }
     }
 
 }
