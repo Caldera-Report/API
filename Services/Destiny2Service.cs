@@ -4,6 +4,7 @@ using API.Services.Abstract;
 using Classes.DB;
 using Classes.DestinyApi;
 using Classes.DTO;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
 using System.Text.Json;
 
@@ -198,6 +199,14 @@ namespace API.Services
                 AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5)
             });
 
+            var player = await _context.Players.FirstOrDefaultAsync(p => p.Id == long.Parse(membershipId));
+
+            if (player != null)
+            {
+                player.LastProfileView = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+            }
+
             return stats;
         }
 
@@ -207,16 +216,17 @@ namespace API.Services
             return characters.Response.characters.data;
         }
 
-        public async Task<List<Player>> GetAllPlayers()
+        public async Task<List<PlayerResponse>> GetAllPlayers()
         {
             var players = _context.Players.Select(
-                players => new Player
+                players => new PlayerResponse
                 {
-                    Id = players.Id,
+                    Id = players.Id.ToString(),
                     MembershipType = players.MembershipType,
                     DisplayName = players.DisplayName,
                     DisplayNameCode = players.DisplayNameCode,
-                    LastUpdateStatus = players.LastUpdateStatus
+                    LastUpdateStatus = "Complete",
+                    LastProfileView = players.LastProfileView
                 }
             )
             .ToList();
