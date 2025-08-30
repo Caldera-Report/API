@@ -228,7 +228,7 @@ namespace API.Services
                     DisplayNameCode = players.DisplayNameCode,
                     LastUpdateStatus = "Complete",
                     UpdatePriority = 1000000,
-                    LastProfileView = players.LastProfileView
+                    //LastProfileView = players.LastProfileView
                 }
             )
             .ToList();
