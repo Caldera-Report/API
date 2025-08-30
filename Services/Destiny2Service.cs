@@ -82,6 +82,7 @@ namespace API.Services
                         MembershipType = type,
                         DisplayName = membership.DisplayName,
                         DisplayNameCode = membership.DisplayNameCode,
+                        UpdatePriority = 1000000,
                         LastUpdateStatus = "Completed"
                     });
                 }
@@ -226,6 +227,7 @@ namespace API.Services
                     DisplayName = players.DisplayName,
                     DisplayNameCode = players.DisplayNameCode,
                     LastUpdateStatus = "Complete",
+                    UpdatePriority = 1000000,
                     LastProfileView = players.LastProfileView
                 }
             )
