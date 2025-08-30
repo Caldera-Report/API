@@ -1,6 +1,5 @@
-﻿using Classes.DTO;
-using Classes.DestinyApi;
-using Classes.DB;
+﻿using Classes.DestinyApi;
+using Classes.DTO;
 
 namespace API.Services.Abstract
 {
@@ -9,6 +8,6 @@ namespace API.Services.Abstract
         public Task<SearchResponse> SearchForPlayer(string playerName);
         public Task<StatisticsResponse> GetStatisticsForPlayer(string membershipId, int membershipType);
         public Task<Dictionary<string, DestinyCharacterComponent>> GetCharactersForPlayer(string membershipId, int membershipType);
-        public Task<List<Player>> GetAllPlayers();
+        public Task<List<PlayerResponse>> GetAllPlayers();
     }
 }
