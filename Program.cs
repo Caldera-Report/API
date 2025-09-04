@@ -10,11 +10,20 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 var builder = FunctionsApplication.CreateBuilder(args);
 
 builder.ConfigureFunctionsWebApplication();
 
+builder.Services.AddLogging(lo =>
+{
+    lo.AddSentry(o =>
+    {
+        o.Dsn = builder.Configuration["SentryDsn"];
+        o.Environment = builder.Environment.EnvironmentName;
+    });
+});
 
 builder.Services.AddDbContextPool<AppDbContext>(options =>
 {

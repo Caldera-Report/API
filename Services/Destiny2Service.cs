@@ -207,16 +207,15 @@ namespace API.Services
             return characters.Response.characters.data;
         }
 
-        public async Task<List<Player>> GetAllPlayers()
+        public async Task<List<PlayerResponse>> GetAllPlayers()
         {
             var players = _context.Players.Select(
-                players => new Player
+                players => new PlayerResponse
                 {
-                    Id = players.Id,
+                    Id = players.Id.ToString(),
                     MembershipType = players.MembershipType,
                     DisplayName = players.DisplayName,
-                    DisplayNameCode = players.DisplayNameCode,
-                    LastUpdateStatus = players.LastUpdateStatus
+                    DisplayNameCode = players.DisplayNameCode
                 }
             )
             .ToList();
