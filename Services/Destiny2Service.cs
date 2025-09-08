@@ -16,6 +16,8 @@ namespace API.Services
         private readonly IDestiny2ApiClient _client;
         private readonly IDistributedCache _cache;
         private readonly AppDbContext _context;
+
+        private static readonly DateTime ActivityCutoffUtc = new(2025, 7, 15, 0, 0, 0, DateTimeKind.Utc);
         public Destiny2Service(IDestiny2ApiClient client, IDistributedCache cache, AppDbContext context)
         {
             _client = client;
@@ -130,7 +132,7 @@ namespace API.Services
             return response.Response.searchResults.SelectMany(r => r.destinyMemberships);
         }
 
-        public async Task<StatisticsResponse> GetStatisticsForPlayer(string membershipId, int membershipType)
+        public async Task<StatisticsResponse> GetStatisticsForPlayer(long membershipId, int membershipType)
         {
             var cacheKey = $"GetStats:{membershipType}+{membershipId}";
             var cached = await _cache.GetStringAsync(cacheKey);
@@ -141,11 +143,11 @@ namespace API.Services
 
             var activityTasks = new List<Task<IEnumerable<DestinyAggregateActivityStats>>>();
 
-            async Task<IEnumerable<DestinyAggregateActivityStats>> GetRelevantActivityDataForCharacter(int membershipType, string membershipId, string characterId)
+            async Task<IEnumerable<DestinyAggregateActivityStats>> GetRelevantActivityDataForCharacter(int mType, long mId, string characterId)
             {
                 try
                 {
-                    var activityResponse = await _client.GetActivityAggregateForCharacter(membershipId, membershipType, characterId);
+                    var activityResponse = await _client.GetActivityAggregateForCharacter(mId, mType, characterId);
                     if (activityResponse.Response.activities == null)
                         return Enumerable.Empty<DestinyAggregateActivityStats>();
                     return activityResponse.Response.activities.Where(a => DestinyApiConstants.AllActivities.Contains(a.activityHash));
@@ -196,7 +198,7 @@ namespace API.Services
                 AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5)
             });
 
-            var player = await _context.Players.FirstOrDefaultAsync(p => p.Id == long.Parse(membershipId));
+            var player = await _context.Players.FirstOrDefaultAsync(p => p.Id == membershipId);
 
             if (player != null)
             {
@@ -207,31 +209,109 @@ namespace API.Services
             return stats;
         }
 
-        public async Task<Dictionary<string, DestinyCharacterComponent>> GetCharactersForPlayer(string membershipId, int membershipType)
+        public async Task<Dictionary<string, DestinyCharacterComponent>> GetCharactersForPlayer(long membershipId, int membershipType)
         {
             var characters = await _client.GetCharactersForPlayer(membershipId, membershipType);
             return characters.Response.characters.data;
         }
 
-        public async Task<List<PlayerResponse>> GetAllPlayers()
+        public async Task LoadPlayerActivityReports(long membershipId, string characterId)
         {
-            var players = _context.Players.Select(
-                players => new PlayerResponse
+            var player = await _context.Players
+                .Include(p => p.LastActivityReport)
+                .FirstOrDefaultAsync(p => p.Id == membershipId);
+
+            var activityHashMap = await _context.ActivityHashMappings.AsNoTracking()
+                .ToDictionaryAsync(m => m.SourceHash, m => m.CanonicalActivityId);
+
+            player.LastUpdateStatus = "Updating";
+            player.LastUpdateStarted = DateTime.UtcNow;
+            _context.Players.Update(player);
+            await _context.SaveChangesAsync();
+
+            var page = 0;
+            var reportsToAdd = new List<ActivityReport>();
+            var hasReachedLastUpdate = false;
+
+            var lastPlayed = player.LastPlayed ?? DateTime.MinValue;
+
+            var since = DateTime.UtcNow - lastPlayed;
+            var activityCount = since < TimeSpan.FromMinutes(15) ? 10 :
+                since < TimeSpan.FromHours(2) ? 25 :
+                since < TimeSpan.FromHours(24) ? 50 :
+                since < TimeSpan.FromDays(7) ? 100 :
+                250;
+
+            Task<DestinyApiResponse<DestinyActivityHistoryResults>> inFlight =
+            _client.GetHistoricalStatsForCharacter(player.Id, player.MembershipType, characterId, page, activityCount);
+
+            try
+            {
+                while (!hasReachedLastUpdate)
                 {
-                    Id = players.Id.ToString(),
-                    MembershipType = players.MembershipType,
-                    DisplayName = players.DisplayName,
-                    DisplayNameCode = players.DisplayNameCode,
-                    LastUpdateStatus = "Complete",
-                    UpdatePriority = 1000000,
-                    //LastProfileView = players.LastProfileView
+                    var response = await inFlight;
+                    if (response.ErrorCode != 1 || response.Response?.activities == null || !response.Response.activities.Any())
+                        break;
+
+                    page++;
+                    var prefetchNext = _client.GetHistoricalStatsForCharacter(player.Id, player.MembershipType, characterId, page, activityCount);
+
+                    foreach (var activity in response.Response.activities)
+                    {
+                        hasReachedLastUpdate = activity.period <= (player.LastActivityReport?.Date ?? DateTime.MinValue);
+                        if (activity.period < ActivityCutoffUtc || hasReachedLastUpdate)
+                            break;
+
+                        var rawHash = activity.activityDetails.referenceId;
+                        if (!activityHashMap.TryGetValue(rawHash, out var canonicalId))
+                            continue;
+
+                        if (!long.TryParse(activity.activityDetails.instanceId, out var instanceId))
+                            continue;
+
+                        reportsToAdd.Add(new ActivityReport
+                        {
+                            InstanceId = instanceId,
+                            ActivityId = canonicalId,
+                            PlayerId = player.Id,
+                            Date = activity.period,
+                            Completed = activity.values["completed"].basic.value == 1.0,
+                            Duration = TimeSpan.FromSeconds(activity.values["activityDurationSeconds"].basic.value),
+                        });
+                    }
+
+                    if (response.Response.activities.Last().period < ActivityCutoffUtc)
+                        break;
+
+                    inFlight = prefetchNext;
                 }
-            )
-            .ToList();
-            if (players.Count == 0)
-                return null;
-            return players;
+
+                if (reportsToAdd.Any())
+                {
+                    _context.ActivityReports.AddRange(reportsToAdd);
+                    await _context.SaveChangesAsync();
+                    player.LastPlayedActivityId = reportsToAdd
+                        .OrderByDescending(r => r.Date)
+                        .Select(r => r.Id)
+                        .FirstOrDefault();
+                }
+
+                player.LastUpdateStatus = "Complete";
+                player.LastUpdateCompleted = DateTime.UtcNow;
+                _context.Players.Update(player);
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                if (await _context.Players.AsNoTracking().AnyAsync(p => p.Id == player.Id))
+                {
+                    player.LastUpdateStatus = $"Error: {ex.Message}";
+                    player.LastUpdateCompleted = DateTime.UtcNow;
+                    _context.Players.Update(player);
+                    try { await _context.SaveChangesAsync(); } catch { /* ignore */ }
+                }
+                throw;
+            }
         }
     }
-
 }

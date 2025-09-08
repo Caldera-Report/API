@@ -101,4 +101,29 @@ public class PlayerFunctions
             return new StatusCodeResult(500);
         }
     }
+
+    [Function("LoadPlayerActivities")]
+    public async Task<IActionResult> LoadPlayerActivities([HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "players/{membershipTypeId}/{membershipId}/load")] HttpRequest req, int membershipTypeId, long membershipId)
+    {
+        _logger.LogInformation($"Load activities request for player {membershipId} of type {membershipTypeId}");
+        if (membershipId <= 0 || membershipTypeId <= 0)
+        {
+            return new BadRequestObjectResult("Membership ID and type are required");
+        }
+        try
+        {
+            var characters = await _destiny2Service.GetCharactersForPlayer(membershipId, membershipTypeId);
+            foreach (var character in characters)
+            {
+                _logger.LogInformation($"Loading activities for character {character.Key} of player {membershipId}");
+                await _destiny2Service.LoadPlayerActivityReports(membershipId, character.Key);
+            }
+            return new OkResult();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, $"Error loading activities for player: {membershipId}");
+            return new StatusCodeResult(500);
+        }
+    }
 }

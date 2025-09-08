@@ -57,7 +57,7 @@ namespace API.Clients
             }
         }
 
-        public async Task<DestinyApiResponse<DestinyProfileResponse>> GetCharactersForPlayer(string membershipId, int membershipType)
+        public async Task<DestinyApiResponse<DestinyProfileResponse>> GetCharactersForPlayer(long membershipId, int membershipType)
         {
             var url = $"Destiny2/{membershipType}/Profile/{membershipId}?components=Characters";
             var response = await _httpClient.GetAsync(url);
@@ -74,7 +74,7 @@ namespace API.Clients
             }
         }
 
-        public async Task<DestinyApiResponse<DestinyAggregateActivityResults>> GetActivityAggregateForCharacter(string membershipId, int membershipType, string characterId)
+        public async Task<DestinyApiResponse<DestinyAggregateActivityResults>> GetActivityAggregateForCharacter(long membershipId, int membershipType, string characterId)
         {
             var url = $"Destiny2/{membershipType}/Account/{membershipId}/Character/{characterId}/Stats/AggregateActivityStats";
             var response = await _httpClient.GetAsync(url);
@@ -88,6 +88,40 @@ namespace API.Clients
             else
             {
                 throw new HttpRequestException($"Error fetching data: {response.ReasonPhrase}");
+            }
+        }
+        public async Task<DestinyApiResponse<DestinyActivityHistoryResults>> GetHistoricalStatsForCharacter(long destinyMembershipId, int membershipType, string characterId, int page, int activityCount)
+        {
+            var url = $"Destiny2/{membershipType}/Account/{destinyMembershipId}/Character/{characterId}/Stats/Activities/?page={page}&mode=7&count={activityCount}";
+            var req = new HttpRequestMessage(HttpMethod.Get, url);
+
+            using var response = await _httpClient.SendAsync(req);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                return JsonSerializer.Deserialize<DestinyApiResponse<DestinyActivityHistoryResults>>(content)
+                    ?? throw new InvalidOperationException("Failed to deserialize response.");
+            }
+            else
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var errorResponse = JsonSerializer.Deserialize<DestinyApiResponseError>(content);
+                if (errorResponse.ErrorCode == 1665) //user is private
+                    return new DestinyApiResponse<DestinyActivityHistoryResults>
+                    {
+                        Response = new DestinyActivityHistoryResults { activities = [] },
+                        ErrorStatus = errorResponse.ErrorStatus,
+                        Message = errorResponse.Message,
+                        MessageData = errorResponse.MessageData,
+                        ErrorCode = errorResponse.ErrorCode,
+                        ThrottleSeconds = errorResponse.ThrottleSeconds
+                    };
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    throw new HttpRequestException($"Error fetching data from Bungie API: {errorContent}");
+                }
             }
         }
     }
