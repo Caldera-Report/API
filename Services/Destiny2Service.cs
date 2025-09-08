@@ -1,5 +1,6 @@
 ﻿using API.Clients.Abstract;
 using API.Data;
+using API.Models.Responses;
 using API.Services.Abstract;
 using Classes.DB;
 using Classes.DestinyApi;
@@ -22,7 +23,7 @@ namespace API.Services
             _context = context;
         }
 
-        public async Task<SearchResponse> SearchForPlayer(string playerName)
+        public async Task<List<PlayerDto>> SearchForPlayer(string playerName)
         {
             var hasBungieId = playerName.Length > 5 && playerName[^5] == '#';
 
@@ -32,31 +33,26 @@ namespace API.Services
 
             var filteredMemberships = response
                     .Where(m => m.applicableMembershipTypes.Count > 0)
-                    .Select(m => new SearchResult
+                    .Select(m => new PlayerDto
                     { 
-                        DestinyMembershipId = m.membershipId.ToString(),
+                        Id = long.Parse(m.membershipId),
                         MembershipType = m.membershipType,
-                        DisplayName = m.bungieGlobalDisplayName,
-                        DisplayNameCode = m.bungieGlobalDisplayNameCode
+                        DisplayName = m.bungieGlobalDisplayName + "#" + m.bungieGlobalDisplayNameCode,
                     })
-                    .DistinctBy(r => r.DestinyMembershipId); //because apparently sometimes there are dupes
+                    .DistinctBy(r => r.Id)
+                    .ToList(); //because apparently sometimes there are dupes
 
-            var result = new SearchResponse
-            {
-                Results = filteredMemberships.ToList()
-            };
+            await AddSearchResultsToDb(filteredMemberships);
 
-            await AddSearchResultsToDb(result);
-
-            return result;
+            return filteredMemberships;
         }
 
-        public async Task AddSearchResultsToDb(SearchResponse result)
+        public async Task AddSearchResultsToDb(List<PlayerDto> result)
         {
-            var membershipIds = result.Results
-                .Select(m => long.Parse(m.DestinyMembershipId))
+            var membershipIds = result
+                .Select(m => m.Id)
                 .ToList();
-            var membershipTypes = result.Results
+            var membershipTypes = result
                 .Select(m => m.MembershipType)
                 .ToList();
 
@@ -70,9 +66,9 @@ namespace API.Services
             );
 
             var newPlayers = new List<Player>();
-            foreach (var membership in result.Results.Distinct())
+            foreach (var membership in result.Distinct())
             {
-                var id = long.Parse(membership.DestinyMembershipId);
+                var id = membership.Id;
                 var type = membership.MembershipType;
                 if (!existingPlayerKeys.Contains((id, type)))
                 {
