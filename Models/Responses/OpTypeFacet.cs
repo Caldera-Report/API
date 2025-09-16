@@ -8,13 +8,13 @@ namespace API.Models.Responses
     {
         public static void Map(OpType source, OpTypeDto target)
         {
-            target.ActivityTypes = source.ActivityTypes?.Select(at => new ActivityTypeDto(at)).ToArray();
+            target.Activities = source.Activities?.Select(a => new ActivityDto(a)).ToArray();
         }
     }
 
-    [Facet(typeof(OpType), exclude: [nameof(OpType.ActivityTypes)], Configuration = typeof(OpTypeMapConfig))]
+    [Facet(typeof(OpType), exclude: [nameof(OpType.Activities)], Configuration = typeof(OpTypeMapConfig))]
     public partial class OpTypeDto
     {
-        public ActivityTypeDto[] ActivityTypes { get; set; }
+        public ActivityDto[] Activities { get; set; }
     };
 }

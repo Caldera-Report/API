@@ -4,10 +4,8 @@ using API.Models.Responses;
 using API.Services.Abstract;
 using Classes.DB;
 using Classes.DestinyApi;
-using Classes.DTO;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
-using System.Text.Json;
 
 namespace API.Services
 {
@@ -39,7 +37,9 @@ namespace API.Services
                     { 
                         Id = long.Parse(m.membershipId),
                         MembershipType = m.membershipType,
-                        DisplayName = m.bungieGlobalDisplayName + "#" + m.bungieGlobalDisplayNameCode,
+                        DisplayName = m.bungieGlobalDisplayName,
+                        DisplayNameCode = m.bungieGlobalDisplayNameCode,
+                        FullDisplayName = m.bungieGlobalDisplayName + "#" + m.bungieGlobalDisplayNameCode
                     })
                     .DistinctBy(r => r.Id)
                     .ToList(); //because apparently sometimes there are dupes
@@ -132,95 +132,14 @@ namespace API.Services
             return response.Response.searchResults.SelectMany(r => r.destinyMemberships);
         }
 
-        public async Task<StatisticsResponse> GetStatisticsForPlayer(long membershipId, int membershipType)
-        {
-            var cacheKey = $"GetStats:{membershipType}+{membershipId}";
-            var cached = await _cache.GetStringAsync(cacheKey);
-            if (cached != null)
-                return JsonSerializer.Deserialize<StatisticsResponse>(cached);
-
-            var characters = await GetCharactersForPlayer(membershipId, membershipType);
-
-            var activityTasks = new List<Task<IEnumerable<DestinyAggregateActivityStats>>>();
-
-            async Task<IEnumerable<DestinyAggregateActivityStats>> GetRelevantActivityDataForCharacter(int mType, long mId, string characterId)
-            {
-                try
-                {
-                    var activityResponse = await _client.GetActivityAggregateForCharacter(mId, mType, characterId);
-                    if (activityResponse.Response.activities == null)
-                        return Enumerable.Empty<DestinyAggregateActivityStats>();
-                    return activityResponse.Response.activities.Where(a => DestinyApiConstants.AllActivities.Contains(a.activityHash));
-                }
-                catch (Exception ex)
-                {
-                    throw new InvalidOperationException("An error occurred while fetching activity data for the character.", ex);
-                }
-            }
-
-            foreach (var character in characters)
-            {
-                activityTasks.Add(GetRelevantActivityDataForCharacter(membershipType, membershipId, character.Key));
-            }
-
-            var activityResults = await Task.WhenAll(activityTasks);
-
-            var stats = new StatisticsResponse
-            {
-                CalderaCompletions = activityResults.SelectMany(a => a)
-                        .Where(a => a.activityHash == DestinyApiConstants.Caldera && a.values["fastestCompletionMsForActivity"].basic.value != 0)
-                        .Sum(a => (int)a.values["activityCompletions"].basic.value),
-                CalderaFastestCompletion = activityResults.SelectMany(a => a)
-                        .Where(a => a.activityHash == DestinyApiConstants.Caldera && a.values["fastestCompletionMsForActivity"].basic.value != 0)
-                        .Min(a => a.values["fastestCompletionMsForActivity"].basic.displayValue),
-                K1Completions = activityResults.SelectMany(a => a)
-                        .Where(a => DestinyApiConstants.K1.Contains(a.activityHash) && a.values["fastestCompletionMsForActivity"].basic.value != 0)
-                        .Sum(a => (int)a.values["activityCompletions"].basic.value),
-                K1FastestCompletion = activityResults.SelectMany(a => a)
-                        .Where(a => DestinyApiConstants.K1.Contains(a.activityHash) && a.values["fastestCompletionMsForActivity"].basic.value != 0)
-                        .Min(a => a.values["fastestCompletionMsForActivity"].basic.displayValue),
-                KellsFallCompletions = activityResults.SelectMany(a => a)
-                        .Where(a => a.activityHash == DestinyApiConstants.KellsFall && a.values["fastestCompletionMsForActivity"].basic.value != 0)
-                        .Sum(a => (int)a.values["activityCompletions"].basic.value),
-                KellsFallFastestCompletion = activityResults.SelectMany(a => a)
-                        .Where(a => a.activityHash == DestinyApiConstants.KellsFall && a.values["fastestCompletionMsForActivity"].basic.value != 0)
-                        .Min(a => a.values["fastestCompletionMsForActivity"].basic.displayValue),
-                EncoreCompletions = activityResults.SelectMany(a => a)
-                        .Where(a => a.activityHash == DestinyApiConstants.Encore && a.values["fastestCompletionMsForActivity"].basic.value != 0)
-                        .Sum(a => (int)a.values["activityCompletions"].basic.value),
-                EncoreFastestCompletion = activityResults.SelectMany(a => a)
-                        .Where(a => a.activityHash == DestinyApiConstants.Encore && a.values["fastestCompletionMsForActivity"].basic.value != 0)
-                        .Min(a => a.values["fastestCompletionMsForActivity"].basic.displayValue),
-            };
-
-            await _cache.SetStringAsync(cacheKey, JsonSerializer.Serialize(stats), new DistributedCacheEntryOptions
-            {
-                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5)
-            });
-
-            var player = await _context.Players.FirstOrDefaultAsync(p => p.Id == membershipId);
-
-            if (player != null)
-            {
-                player.LastProfileView = DateTime.UtcNow;
-                await _context.SaveChangesAsync();
-            }
-
-            return stats;
-        }
-
         public async Task<Dictionary<string, DestinyCharacterComponent>> GetCharactersForPlayer(long membershipId, int membershipType)
         {
             var characters = await _client.GetCharactersForPlayer(membershipId, membershipType);
             return characters.Response.characters.data;
         }
 
-        public async Task LoadPlayerActivityReports(long membershipId, string characterId)
+        public async Task LoadPlayerActivityReports(Player player, string characterId)
         {
-            var player = await _context.Players
-                .Include(p => p.LastActivityReport)
-                .FirstOrDefaultAsync(p => p.Id == membershipId);
-
             var activityHashMap = await _context.ActivityHashMappings.AsNoTracking()
                 .ToDictionaryAsync(m => m.SourceHash, m => m.CanonicalActivityId);
 

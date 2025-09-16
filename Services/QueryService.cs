@@ -1,6 +1,7 @@
 ﻿using API.Data;
 using API.Models.Responses;
 using API.Services.Abstract;
+using Classes.DB;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -38,8 +39,7 @@ namespace API.Services
             try
             {
                 var activities = await _context.OpTypes
-                    .Include(o => o.ActivityTypes)
-                    .ThenInclude(at => at.Activities)
+                    .Include(o => o.Activities)
                     .Select(OpTypeDto.Projection)
                     .ToListAsync();
                 return activities;
@@ -68,6 +68,24 @@ namespace API.Services
             }
         }
 
+        public async Task<Player> GetPlayerDbObject(long id)
+        {
+            try
+            {
+                var player = await _context.Players
+                    .Include(p => p.LastActivityReport)
+                    .FirstOrDefaultAsync(p => p.Id == id);
+                if (player is null)
+                    throw new Exception("Player not found");
+                return player;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error retrieving player {id} from database");
+                throw;
+            }
+        }
+
         public async Task<List<ActivityReportDto>> GetPlayerReportsForActivityAsync(long playerId, long activityId)
         {
             try
@@ -81,6 +99,120 @@ namespace API.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Error retrieving activity reports for player {playerId} and activity {activityId}");
+                throw;
+            }
+        }
+
+        public async Task<List<CompletionsLeaderboardResponse>> GetCompletionsLeaderboardAsync(long activityId)
+        {
+            try
+            {
+                var query = _context.ActivityReports
+                    .AsNoTracking()
+                    .Where(ar => ar.Completed);
+
+                if (activityId > 0)
+                    query = query.Where(ar => ar.ActivityId == activityId);
+
+                var leaderboard = await query
+                    .GroupBy(ar => ar.PlayerId)
+                    .Select(g => new
+                    {
+                        PlayerId = g.Key,
+                        Completions = g.Count()
+                    })
+                    .OrderByDescending(x => x.Completions)
+                    .ThenBy(x => x.PlayerId)
+                    .Join(
+                        _context.Players.AsNoTracking(),
+                        g => g.PlayerId,
+                        p => p.Id,
+                        (g, p) => new CompletionsLeaderboardResponse
+                        {
+                            Player = new PlayerDto(p),
+                            Completions = g.Completions
+                        })
+                    .ToListAsync();
+
+                return leaderboard;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving completions leaderboard for activity {ActivityId}", activityId);
+                throw;
+            }
+        }
+
+        public async Task<List<TimeLeaderboardResponse>> GetSpeedLeaderboardAsync(long activityId)
+        {
+            try
+            {
+                var query = _context.ActivityReports
+                    .AsNoTracking()
+                    .Where(ar => ar.Completed);
+                if (activityId > 0)
+                    query = query.Where(ar => ar.ActivityId == activityId);
+                var leaderboard = await query
+                    .GroupBy(ar => ar.PlayerId)
+                    .Select(g => new
+                    {
+                        PlayerId = g.Key,
+                        BestTime = g.Min(ar => ar.Duration)
+                    })
+                    .OrderBy(x => x.BestTime)
+                    .ThenBy(x => x.PlayerId)
+                    .Join(
+                        _context.Players.AsNoTracking(),
+                        g => g.PlayerId,
+                        p => p.Id,
+                        (g, p) => new TimeLeaderboardResponse
+                        {
+                            Player = new PlayerDto(p),
+                            Time = g.BestTime
+                        })
+                    .ToListAsync();
+                return leaderboard;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving speed leaderboard for activity {ActivityId}", activityId);
+                throw;
+            }
+        }
+
+        public async Task<List<TimeLeaderboardResponse>> GetTotalTimeLeaderboardAsync(long activityId)
+        {
+            try
+            {
+                var query = _context.ActivityReports
+                    .AsNoTracking()
+                    .Where(ar => ar.Duration > TimeSpan.FromSeconds(0));
+                if (activityId > 0)
+                    query = query.Where(ar => ar.ActivityId == activityId);
+                var leaderboard = await query
+                    .GroupBy(ar => ar.PlayerId)
+                    .Select(g => new
+                    {
+                        PlayerId = g.Key,
+                        TotalTime = g.Sum(ar => ar.Duration.Seconds)
+                    })
+                    .OrderByDescending(x => x.TotalTime)
+                    .ThenBy(x => x.PlayerId)
+                    .Join(
+                        _context.Players.AsNoTracking(),
+                        g => g.PlayerId,
+                        p => p.Id,
+                        (g, p) => new TimeLeaderboardResponse
+                        {
+                            Player = new PlayerDto(p),
+                            Time = TimeSpan.FromSeconds(g.TotalTime)
+                        })
+                    .ToListAsync();
+                return leaderboard;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving total time leaderboard for activity {ActivityId}", activityId);
                 throw;
             }
         }

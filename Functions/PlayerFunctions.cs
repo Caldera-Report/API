@@ -36,7 +36,13 @@ public class PlayerFunctions
         try
         {
             var searchResults = await _destiny2Service.SearchForPlayer(playerName);
-            return new OkObjectResult(searchResults);
+            JsonSerializer.Serialize(searchResults, _jsonOptions);
+            return new ContentResult
+            {
+                Content = JsonSerializer.Serialize(searchResults, _jsonOptions),
+                StatusCode = StatusCodes.Status200OK,
+                ContentType = "application/json"
+            };
         }
         catch (Exception ex)
         {
@@ -103,22 +109,28 @@ public class PlayerFunctions
     }
 
     [Function("LoadPlayerActivities")]
-    public async Task<IActionResult> LoadPlayerActivities([HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "players/{membershipTypeId}/{membershipId}/load")] HttpRequest req, int membershipTypeId, long membershipId)
+    public async Task<IActionResult> LoadPlayerActivities([HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "players/{membershipId}/load")] HttpRequest req, long membershipId)
     {
-        _logger.LogInformation($"Load activities request for player {membershipId} of type {membershipTypeId}");
-        if (membershipId <= 0 || membershipTypeId <= 0)
+        _logger.LogInformation($"Load activities request for player {membershipId} ");
+        if (membershipId <= 0)
         {
             return new BadRequestObjectResult("Membership ID and type are required");
         }
         try
         {
-            var characters = await _destiny2Service.GetCharactersForPlayer(membershipId, membershipTypeId);
+            var player = await _queryService.GetPlayerDbObject(membershipId);
+
+            //if (DateTime.UtcNow - player.LastUpdateCompleted < TimeSpan.FromMinutes(5))
+            //    throw new Exception("Attempted to update player before it's been 5 minutes since their last update");
+
+            var characters = await _destiny2Service.GetCharactersForPlayer(membershipId, player.MembershipType);
             foreach (var character in characters)
             {
                 _logger.LogInformation($"Loading activities for character {character.Key} of player {membershipId}");
-                await _destiny2Service.LoadPlayerActivityReports(membershipId, character.Key);
+                await _destiny2Service.LoadPlayerActivityReports(player, character.Key);
             }
-            return new OkResult();
+
+            return new OkObjectResult(new { Success = true });
         }
         catch (Exception ex)
         {
