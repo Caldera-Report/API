@@ -18,7 +18,8 @@ namespace API.Helpers
                 return new StatusCodeResult(StatusCodes.Status304NotModified);
             }
 
-            req.HttpContext.Response.Headers.CacheControl = "public, max-age=3600";
+            if (cacheDuration > 0)
+                req.HttpContext.Response.Headers.CacheControl = $"public, max-age={cacheDuration}";
             req.HttpContext.Response.Headers.ETag = etag;
 
             return new ContentResult

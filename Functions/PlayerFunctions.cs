@@ -76,7 +76,7 @@ public class PlayerFunctions
         try
         {
             var players = await _queryService.GetAllPlayersAsync();
-            return ResponseHelpers.CachedJson(req, players, _jsonOptions);
+            return ResponseHelpers.CachedJson(req, players, _jsonOptions, 0);
         }
         catch (Exception ex)
         {
