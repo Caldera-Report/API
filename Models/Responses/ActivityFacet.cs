@@ -11,6 +11,6 @@ namespace API.Models.Responses
             target.Name = source.Name.Contains(": Customize") ? source.Name[..^11] : source.Name;
         }
     }
-    [Facet(typeof(Activity), exclude: [nameof(Activity.ActivityReports), nameof(Activity.ActivityType)], Configuration = typeof(ActivityMapConfig))]
+    [Facet(typeof(Activity), exclude: [nameof(Activity.ActivityReports), nameof(Activity.OpType)], Configuration = typeof(ActivityMapConfig))]
     public partial class ActivityDto;
 }

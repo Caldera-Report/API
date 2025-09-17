@@ -22,7 +22,8 @@ namespace API.Models.Responses
         nameof(Player.UpdatePriority),
         nameof(Player.LastUpdateStatus),
         nameof(Player.ActivityReports),
-        nameof(Player.LastActivityReport)],
+        nameof(Player.LastActivityReport),
+        nameof(Player.NeedsFullCheck)],
         Configuration = typeof(PlayerMapConfig))]
     public partial class PlayerDto
     {
