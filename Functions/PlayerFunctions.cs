@@ -120,8 +120,8 @@ public class PlayerFunctions
         {
             var player = await _queryService.GetPlayerDbObject(membershipId);
 
-            //if (DateTime.UtcNow - player.LastUpdateCompleted < TimeSpan.FromMinutes(5))
-            //    throw new Exception("Attempted to update player before it's been 5 minutes since their last update");
+            if (DateTime.UtcNow - player.LastUpdateCompleted < TimeSpan.FromMinutes(5))
+                return new NoContentResult();
 
             var characters = await _destiny2Service.GetCharactersForPlayer(membershipId, player.MembershipType);
             foreach (var character in characters)
