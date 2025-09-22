@@ -13,5 +13,6 @@ namespace API.Services.Abstract
         public Task<List<CompletionsLeaderboardResponse>> GetCompletionsLeaderboardAsync(long activityId);
         public Task<List<TimeLeaderboardResponse>> GetSpeedLeaderboardAsync(long activityId);
         public Task<List<TimeLeaderboardResponse>> GetTotalTimeLeaderboardAsync(long activityId);
+        public Task UpdatePlayerEmblems(Player player, string backgroundEmblemPath, string emblemPath);
     }
 }

@@ -52,7 +52,7 @@ public class PlayerFunctions
     }
 
     [Function("GetPlayer")]
-    public async Task<IActionResult> GetPlayer([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "players/{membershipTypeId}/{membershipId}")] HttpRequest req, long membershipId)
+    public async Task<IActionResult> GetPlayer([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "players/{membershipId}")] HttpRequest req, long membershipId)
     {
         _logger.LogInformation($"Player request for MembershipId: {membershipId}");
 
@@ -129,6 +129,10 @@ public class PlayerFunctions
                 _logger.LogInformation($"Loading activities for character {character.Key} of player {membershipId}");
                 await _destiny2Service.LoadPlayerActivityReports(player, character.Key);
             }
+
+            var lastplayed = characters.Values.OrderByDescending(c => c.dateLastPlayed).FirstOrDefault();
+
+            await _queryService.UpdatePlayerEmblems(player, lastplayed?.emblemBackgroundPath ?? "", lastplayed?.emblemPath ?? "");
 
             return new OkObjectResult(new { Success = true });
         }

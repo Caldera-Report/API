@@ -216,5 +216,21 @@ namespace API.Services
                 throw;
             }
         }
+
+        public async Task UpdatePlayerEmblems(Player player, string backgroundEmblemPath, string emblemPath)
+        {
+            try
+            {
+                player.LastPlayedCharacterEmblemPath = emblemPath;
+                player.LastPlayedCharacterBackgroundPath = backgroundEmblemPath;
+                _context.Players.Update(player);
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error updating emblem for player {player.Id}");
+                throw;
+            }
+        }
     }
 }

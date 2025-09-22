@@ -11,7 +11,7 @@ namespace API.Helpers
         public static IActionResult CachedJson<T>(HttpRequest req, T data, JsonSerializerOptions options, int cacheDuration = 3600)
         {
             var responseJson = JsonSerializer.Serialize(data, options);
-            var etag = "\"" + Convert.ToBase64String(MD5.HashData(Encoding.UTF8.GetBytes(responseJson))) + "\"";
+            var etag = "\"" + Convert.ToHexString(MD5.HashData(Encoding.UTF8.GetBytes(responseJson))) + "\"";
 
             if (req.Headers.TryGetValue("If-None-Match", out var inm) && inm == etag)
             {
