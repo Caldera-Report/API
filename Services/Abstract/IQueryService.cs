@@ -9,7 +9,7 @@ namespace API.Services.Abstract
         public Task<List<OpTypeDto>> GetAllActivitiesAsync();
         public Task<PlayerDto> GetPlayerAsync(long id);
         public Task<Player> GetPlayerDbObject(long id);
-        public Task<List<ActivityReportDto>> GetPlayerReportsForActivityAsync(long playerId, long activityId);
+        public Task<ActivityReportListDTO> GetPlayerReportsForActivityAsync(long playerId, long activityId);
         public Task<List<CompletionsLeaderboardResponse>> GetCompletionsLeaderboardAsync(long activityId);
         public Task<List<TimeLeaderboardResponse>> GetSpeedLeaderboardAsync(long activityId);
         public Task<List<TimeLeaderboardResponse>> GetTotalTimeLeaderboardAsync(long activityId);

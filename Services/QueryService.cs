@@ -86,7 +86,7 @@ namespace API.Services
             }
         }
 
-        public async Task<List<ActivityReportDto>> GetPlayerReportsForActivityAsync(long playerId, long activityId)
+        public async Task<ActivityReportListDTO> GetPlayerReportsForActivityAsync(long playerId, long activityId)
         {
             try
             {
@@ -94,7 +94,15 @@ namespace API.Services
                     .Where(ar => ar.PlayerId == playerId && ar.ActivityId == activityId)
                     .Select(ActivityReportDto.Projection)
                     .ToListAsync();
-                return reports;
+                var averageMs = reports.Count > 0 ? reports.Where(r => r.Completed).Select(r => r.Duration.TotalMilliseconds).Average() : 0;
+                var average = TimeSpan.FromMilliseconds(averageMs);
+                var fastest = reports.OrderBy(r => r.Duration).FirstOrDefault(r => r.Completed);
+                return new ActivityReportListDTO
+                {
+                    Reports = reports,
+                    Average = average,
+                    Best = fastest
+                };
             }
             catch (Exception ex)
             {
