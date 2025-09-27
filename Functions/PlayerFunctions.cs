@@ -65,7 +65,7 @@ public class PlayerFunctions
         try
         {
             var results = await _queryService.GetPlayerAsync(membershipId);
-            return ResponseHelpers.CachedJson(req, results, _jsonOptions);
+            return ResponseHelpers.CachedJson(req, results, _jsonOptions, 0);
         }
         catch (Exception ex)
         {

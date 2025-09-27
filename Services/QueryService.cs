@@ -94,7 +94,7 @@ namespace API.Services
                     .Where(ar => ar.PlayerId == playerId && ar.ActivityId == activityId)
                     .Select(ActivityReportDto.Projection)
                     .ToListAsync();
-                var averageMs = reports.Count > 0 ? reports.Where(r => r.Completed).Select(r => r.Duration.TotalMilliseconds).Average() : 0;
+                var averageMs = reports.Count(r => r.Completed) > 0 ? reports.Where(r => r.Completed).Select(r => r.Duration.TotalMilliseconds).Average() : 0;
                 var average = TimeSpan.FromMilliseconds(averageMs);
                 var fastest = reports.OrderBy(r => r.Duration).FirstOrDefault(r => r.Completed);
                 return new ActivityReportListDTO
@@ -165,10 +165,11 @@ namespace API.Services
                     .Select(g => new
                     {
                         PlayerId = g.Key,
-                        BestTime = g.Min(ar => ar.Duration)
+                        BestTime = g.Min(ar => ar.Duration),
+                        CompletedDate = g.OrderBy(ar => ar.Duration).Select(ar => ar.Date).First()
                     })
                     .OrderBy(x => x.BestTime)
-                    .ThenBy(x => x.PlayerId)
+                    .ThenBy(x => x.CompletedDate)
                     .Join(
                         _context.Players.AsNoTracking(),
                         g => g.PlayerId,
