@@ -15,10 +15,8 @@ namespace API.Models.Responses
     [Facet(typeof(Player), exclude: [
         nameof(Player.LastPlayed),
         nameof(Player.LastPlayedActivityId),
-        nameof(Player.LastProfileView),
         nameof(Player.LastUpdateStarted),
         nameof(Player.LastUpdateCompleted),
-        nameof(Player.LastProfileView),
         nameof(Player.UpdatePriority),
         nameof(Player.LastUpdateStatus),
         nameof(Player.ActivityReports),

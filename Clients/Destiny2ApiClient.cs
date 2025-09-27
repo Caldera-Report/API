@@ -93,9 +93,7 @@ namespace API.Clients
         public async Task<DestinyApiResponse<DestinyActivityHistoryResults>> GetHistoricalStatsForCharacter(long destinyMembershipId, int membershipType, string characterId, int page, int activityCount)
         {
             var url = $"Destiny2/{membershipType}/Account/{destinyMembershipId}/Character/{characterId}/Stats/Activities/?page={page}&mode=7&count={activityCount}";
-            var req = new HttpRequestMessage(HttpMethod.Get, url);
-
-            using var response = await _httpClient.SendAsync(req);
+            var response = await _httpClient.GetAsync(url);
 
             if (response.IsSuccessStatusCode)
             {

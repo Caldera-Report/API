@@ -12,18 +12,18 @@
   </ItemGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
-    <PackageReference Include="Classes" Version="1.5.11" />
-    <PackageReference Include="Facet" Version="2.7.0" />
-    <PackageReference Include="Facet.Extensions" Version="2.7.0" />
-    <PackageReference Include="Facet.Extensions.EFCore" Version="2.7.0" />
-    <PackageReference Include="Facet.Mapping" Version="2.7.0" />
-    <PackageReference Include="Microsoft.Azure.Functions.Worker" Version="2.0.0" />
+    <PackageReference Include="Classes" Version="1.5.13" />
+    <PackageReference Include="Facet" Version="2.8.1" />
+    <PackageReference Include="Facet.Extensions" Version="2.8.1" />
+    <PackageReference Include="Facet.Extensions.EFCore" Version="2.8.1" />
+    <PackageReference Include="Facet.Mapping" Version="2.8.1" />
+    <PackageReference Include="Microsoft.Azure.Functions.Worker" Version="2.1.0" />
     <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Http" Version="3.3.0" />
     <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore" Version="2.0.2" />
     <PackageReference Include="Microsoft.Azure.Functions.Worker.Sdk" Version="2.0.5" />
     <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="9.0.9" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
-    <PackageReference Include="Sentry.AspNetCore" Version="5.15.0" />
+    <PackageReference Include="Sentry.AspNetCore" Version="5.15.1" />
   </ItemGroup>
   <ItemGroup>
     <None Update="host.json">
