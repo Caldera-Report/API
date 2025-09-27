@@ -2,6 +2,7 @@ using API.Clients;
 using API.Clients.Abstract;
 using API.Configuration;
 using API.Data;
+using API.Models.Serializers;
 using API.Services;
 using API.Services.Abstract;
 using Microsoft.Azure.Functions.Worker;
@@ -10,11 +11,21 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using System.Text.Json;
 
 var builder = FunctionsApplication.CreateBuilder(args);
 
 builder.ConfigureFunctionsWebApplication();
 
+builder.Services.AddLogging(lo =>
+{
+    lo.AddSentry(o =>
+    {
+        o.Dsn = builder.Configuration["SentryDsn"];
+        o.Environment = builder.Environment.EnvironmentName;
+    });
+});
 
 builder.Services.AddDbContextPool<AppDbContext>(options =>
 {
@@ -44,10 +55,13 @@ builder.Services.AddStackExchangeRedisCache(options =>
 
 builder.Services.AddHttpClient<IDestiny2ApiClient, Destiny2ApiClient>();
 builder.Services.AddScoped<IDestiny2Service, Destiny2Service>();
+builder.Services.AddScoped<IQueryService, QueryService>();
 
-// Application Insights isn't enabled by default. See https://aka.ms/AAt8mw4.
-builder.Services
-    .AddApplicationInsightsTelemetryWorkerService()
-    .ConfigureFunctionsApplicationInsights();
+builder.Services.AddSingleton(sp =>
+{
+    var json = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+    json.Converters.Add(new Int64AsStringJsonConverter());
+    return json;
+});
 
 builder.Build().Run();

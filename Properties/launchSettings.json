@@ -3,7 +3,8 @@
     "API": {
       "commandName": "Project",
       "commandLineArgs": "--port 7187",
-      "launchBrowser": false
+      "launchBrowser": false,
+      "hotReloadEnabled": true
     }
   }
 }

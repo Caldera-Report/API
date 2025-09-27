@@ -10,7 +10,6 @@ namespace API.Data
         }
         public DbSet<Player> Players { get; set; }
         public DbSet<OpType> OpTypes { get; set; }
-        public DbSet<ActivityType> ActivityTypes { get; set; }
         public DbSet<Activity> Activities { get; set; }
         public DbSet<ActivityReport> ActivityReports { get; set; }
         public DbSet<ActivityHashMapping> ActivityHashMappings { get; set; }
@@ -70,10 +69,6 @@ namespace API.Data
 
             modelBuilder.Entity<Activity>()
                 .Property(a => a.Id)
-                .ValueGeneratedNever();
-
-            modelBuilder.Entity<ActivityType>()
-                .Property(at => at.Id)
                 .ValueGeneratedNever();
 
             modelBuilder.Entity<ActivityReport>(entity =>
