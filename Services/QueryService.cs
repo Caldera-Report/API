@@ -3,6 +3,7 @@ using API.Models.Responses;
 using API.Services.Abstract;
 using Classes.DB;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 
 namespace API.Services
@@ -10,11 +11,13 @@ namespace API.Services
     public class QueryService : IQueryService
     {
         private readonly AppDbContext _context;
+        private readonly IDistributedCache _cache;
         private readonly ILogger<QueryService> _logger;
 
-        public QueryService(AppDbContext context, ILogger<QueryService> logger)
+        public QueryService(AppDbContext context, IDistributedCache cache, ILogger<QueryService> logger)
         {
             _context = context;
+            _cache = cache;
             _logger = logger;
         }
 
@@ -38,15 +41,50 @@ namespace API.Services
         {
             try
             {
-                var activities = await _context.OpTypes
-                    .Include(o => o.Activities)
-                    .Select(OpTypeDto.Projection)
-                    .ToListAsync();
-                return activities;
+                var activities = await _cache.GetAsync("activities:all");
+                if (activities != null)
+                {
+                    return System.Text.Json.JsonSerializer.Deserialize<List<OpTypeDto>>(activities)
+                        ?? new List<OpTypeDto>();
+                }
+                else
+                {
+                    await CacheAllActivitiesAsync();
+                    activities = await _cache.GetAsync("activities:all");
+                    if (activities != null)
+                    {
+                        return System.Text.Json.JsonSerializer.Deserialize<List<OpTypeDto>>(activities)
+                            ?? new List<OpTypeDto>();
+                    }
+                    else
+                    {
+                        return new List<OpTypeDto>();
+                    }
+                }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error retrieving activities from database");
+                throw;
+            }
+        }
+
+        public async Task CacheAllActivitiesAsync()
+        {
+            try
+            {
+                var activities = await _context.OpTypes
+                    .Include(o => o.Activities)
+                    .Select(OpTypeDto.Projection)
+                    .ToListAsync();
+                await _cache.SetAsync("activities:all", System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(activities), new DistributedCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(1).Add(TimeSpan.FromHours(1))
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error caching activities");
                 throw;
             }
         }
@@ -115,6 +153,102 @@ namespace API.Services
         {
             try
             {
+                var cachedData = await _cache.GetAsync($"leaderboard:completions:{activityId}");
+                if (cachedData != null)
+                {
+                    return System.Text.Json.JsonSerializer.Deserialize<List<CompletionsLeaderboardResponse>>(cachedData)
+                        ?? new List<CompletionsLeaderboardResponse>();
+                }
+                else
+                {
+                    await ComputeCompletionsLeaderboardAsync(activityId);
+                    cachedData = await _cache.GetAsync($"leaderboard:completions:{activityId}");
+                    if (cachedData != null)
+                    {
+                        return System.Text.Json.JsonSerializer.Deserialize<List<CompletionsLeaderboardResponse>>(cachedData)
+                            ?? new List<CompletionsLeaderboardResponse>();
+                    }
+                    else
+                    {
+                        return new List<CompletionsLeaderboardResponse>();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving completions leaderboard for activity {ActivityId}", activityId);
+                throw;
+            }
+        }
+
+        public async Task<List<TimeLeaderboardResponse>> GetSpeedLeaderboardAsync(long activityId)
+        {
+            try
+            {
+                var cachedData = await _cache.GetAsync($"leaderboard:speed:{activityId}");
+                if (cachedData != null)
+                {
+                    return System.Text.Json.JsonSerializer.Deserialize<List<TimeLeaderboardResponse>>(cachedData)
+                        ?? new List<TimeLeaderboardResponse>();
+                }
+                else
+                {
+                    await ComputeSpeedLeaderboardAsync(activityId);
+                    cachedData = await _cache.GetAsync($"leaderboard:speed:{activityId}");
+                    if (cachedData != null)
+                    {
+                        return System.Text.Json.JsonSerializer.Deserialize<List<TimeLeaderboardResponse>>(cachedData)
+                            ?? new List<TimeLeaderboardResponse>();
+                    }
+                    else
+                    {
+                        return new List<TimeLeaderboardResponse>();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving speed leaderboard for activity {ActivityId}", activityId);
+                throw;
+            }
+        }
+
+        public async Task<List<TimeLeaderboardResponse>> GetTotalTimeLeaderboardAsync(long activityId)
+        {
+            try
+            {
+                var cachedData = await _cache.GetAsync($"leaderboard:totalTime:{activityId}");
+                if (cachedData != null)
+                {
+                    return System.Text.Json.JsonSerializer.Deserialize<List<TimeLeaderboardResponse>>(cachedData)
+                        ?? new List<TimeLeaderboardResponse>();
+                }
+                else
+                {
+                    await ComputeTotalTimeLeaderboardAsync(activityId);
+                    cachedData = await _cache.GetAsync($"leaderboard:totalTime:{activityId}");
+                    if (cachedData != null)
+                    {
+                        return System.Text.Json.JsonSerializer.Deserialize<List<TimeLeaderboardResponse>>(cachedData)
+                            ?? new List<TimeLeaderboardResponse>();
+                    }
+                    else
+                    {
+                        return new List<TimeLeaderboardResponse>();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving total time leaderboard for activity {ActivityId}", activityId);
+                throw;
+            }
+        }
+
+        public async Task ComputeCompletionsLeaderboardAsync(long activityId)
+        {
+            try
+            {
                 var query = _context.ActivityReports
                     .AsNoTracking()
                     .Where(ar => ar.Completed);
@@ -142,7 +276,10 @@ namespace API.Services
                         })
                     .ToListAsync();
 
-                return leaderboard;
+                await _cache.SetAsync($"leaderboard:completions:{activityId}", System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(leaderboard), new DistributedCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(1).Add(TimeSpan.FromHours(1))
+                });
             }
             catch (Exception ex)
             {
@@ -151,7 +288,7 @@ namespace API.Services
             }
         }
 
-        public async Task<List<TimeLeaderboardResponse>> GetSpeedLeaderboardAsync(long activityId)
+        public async Task ComputeSpeedLeaderboardAsync(long activityId)
         {
             try
             {
@@ -180,7 +317,10 @@ namespace API.Services
                             Time = g.BestTime
                         })
                     .ToListAsync();
-                return leaderboard;
+                await _cache.SetAsync($"leaderboard:speed:{activityId}", System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(leaderboard), new DistributedCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(1).Add(TimeSpan.FromHours(1))
+                });
             }
             catch (Exception ex)
             {
@@ -189,7 +329,7 @@ namespace API.Services
             }
         }
 
-        public async Task<List<TimeLeaderboardResponse>> GetTotalTimeLeaderboardAsync(long activityId)
+        public async Task ComputeTotalTimeLeaderboardAsync(long activityId)
         {
             try
             {
@@ -217,7 +357,10 @@ namespace API.Services
                             Time = TimeSpan.FromSeconds(g.TotalTime)
                         })
                     .ToListAsync();
-                return leaderboard;
+                await _cache.SetAsync($"leaderboard:totalTime:{activityId}", System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(leaderboard), new DistributedCacheEntryOptions 
+                { 
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(1).Add(TimeSpan.FromHours(1)) 
+                });
             }
             catch (Exception ex)
             {

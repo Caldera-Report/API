@@ -12,14 +12,12 @@ namespace API.Services
     public class Destiny2Service : IDestiny2Service
     {
         private readonly IDestiny2ApiClient _client;
-        private readonly IDistributedCache _cache;
         private readonly AppDbContext _context;
 
         private static readonly DateTime ActivityCutoffUtc = new(2025, 7, 15, 0, 0, 0, DateTimeKind.Utc);
-        public Destiny2Service(IDestiny2ApiClient client, IDistributedCache cache, AppDbContext context)
+        public Destiny2Service(IDestiny2ApiClient client, AppDbContext context)
         {
             _client = client;
-            _cache = cache; 
             _context = context;
         }
 

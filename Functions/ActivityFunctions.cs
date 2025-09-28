@@ -36,6 +36,19 @@ public class ActivityFunctions
         }
     }
 
+    [Function("CacheActivities")]
+    public async Task CacheActivities([TimerTrigger("0 0 * * * *")] TimerInfo timer)
+    {
+        try
+        {
+            await _queryService.CacheAllActivitiesAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error caching activities");
+        }
+    }
+
     [Function("GetCompletionsLeaderboard")]
     public async Task<IActionResult> GetCompletionsLeaderboard([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "activities/leaderboards/completions/{activityId}")] HttpRequest req, long activityId)
     {
@@ -77,6 +90,27 @@ public class ActivityFunctions
         {
             _logger.LogError(ex, "Error retrieving total time leaderboard");
             return new StatusCodeResult(500);
+        }
+    }
+
+    [Function("ComputeLeaderboards")]
+    public async Task ComputeLeaderboards([TimerTrigger("0 0 * * * *")] TimerInfo timer)
+    {
+        try
+        {
+            var activities = await _queryService.GetAllActivitiesAsync();
+            var idList = activities.SelectMany(a => a.Activities.Select(a => a.Id)).ToList();
+            idList.Add(0);
+            foreach (var id in idList)
+            {
+                await _queryService.ComputeCompletionsLeaderboardAsync(id);
+                await _queryService.ComputeSpeedLeaderboardAsync(id);
+                await _queryService.ComputeTotalTimeLeaderboardAsync(id);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error computing leaderboards");
         }
     }
 }
