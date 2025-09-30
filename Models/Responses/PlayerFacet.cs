@@ -8,7 +8,7 @@ namespace API.Models.Responses
     {
         public static void Map(Player source, PlayerDto target)
         {
-            target.FullDisplayName = $"{source.DisplayName}#{source.DisplayNameCode}";
+            target.FullDisplayName = source.DisplayNameCode > 1000 ? $"{source.DisplayName}#{source.DisplayNameCode}" : $"{source.DisplayName}#0{source.DisplayNameCode}";
         }
     }
 
