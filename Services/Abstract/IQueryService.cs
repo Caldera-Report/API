@@ -5,7 +5,7 @@ namespace API.Services.Abstract
 {
     public interface IQueryService
     {
-        public Task<List<PlayerDto>> GetAllPlayersAsync();
+        public Task<List<PlayerSearchDto>> GetAllPlayersAsync();
         public Task<List<OpTypeDto>> GetAllActivitiesAsync();
         public Task CacheAllActivitiesAsync();
         public Task<PlayerDto> GetPlayerAsync(long id);

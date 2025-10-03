@@ -56,7 +56,6 @@ public class PlayerFunctions
     {
         _logger.LogInformation($"Player request for MembershipId: {membershipId}");
 
-
         if (membershipId <= 0)
         {
             return new BadRequestObjectResult("Membership ID and type are required");
