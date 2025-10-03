@@ -1,7 +1,6 @@
 ﻿using API.Models.Responses;
 using Classes.DB;
 using Classes.DestinyApi;
-using Classes.DTO;
 
 namespace API.Services.Abstract
 {
