@@ -5,6 +5,7 @@ using Classes.DB;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
+using System.Text.Json;
 
 namespace API.Services
 {
@@ -21,14 +22,24 @@ namespace API.Services
             _logger = logger;
         }
 
-        public async Task<List<PlayerDto>> GetAllPlayersAsync()
+        public async Task<List<PlayerSearchDto>> GetAllPlayersAsync()
         {
             try
             {
-                var players = await _context.Players
-                    .Select(PlayerDto.Projection)
-                    .ToListAsync();
-                return players;
+                var players = await _cache.GetAsync("players:all");
+                if (players is not null)
+                    return JsonSerializer.Deserialize<List<PlayerSearchDto>>(players)!;
+                else
+                {
+                    var playerList = await _context.Players
+                        .Select(PlayerSearchDto.Projection)
+                        .ToListAsync();
+                    await _cache.SetAsync("players:all", JsonSerializer.SerializeToUtf8Bytes(playerList), new DistributedCacheEntryOptions
+                    {
+                        AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(1)
+                    });
+                    return playerList;
+                }
             }
             catch (Exception ex)
             {
@@ -156,7 +167,7 @@ namespace API.Services
                 var cachedData = await _cache.GetAsync($"leaderboard:completions:{activityId}");
                 if (cachedData != null)
                 {
-                    return System.Text.Json.JsonSerializer.Deserialize<List<CompletionsLeaderboardResponse>>(cachedData)
+                    return JsonSerializer.Deserialize<List<CompletionsLeaderboardResponse>>(cachedData)
                         ?? new List<CompletionsLeaderboardResponse>();
                 }
                 else
@@ -165,7 +176,7 @@ namespace API.Services
                     cachedData = await _cache.GetAsync($"leaderboard:completions:{activityId}");
                     if (cachedData != null)
                     {
-                        return System.Text.Json.JsonSerializer.Deserialize<List<CompletionsLeaderboardResponse>>(cachedData)
+                        return JsonSerializer.Deserialize<List<CompletionsLeaderboardResponse>>(cachedData)
                             ?? new List<CompletionsLeaderboardResponse>();
                     }
                     else
@@ -188,7 +199,7 @@ namespace API.Services
                 var cachedData = await _cache.GetAsync($"leaderboard:speed:{activityId}");
                 if (cachedData != null)
                 {
-                    return System.Text.Json.JsonSerializer.Deserialize<List<TimeLeaderboardResponse>>(cachedData)
+                    return JsonSerializer.Deserialize<List<TimeLeaderboardResponse>>(cachedData)
                         ?? new List<TimeLeaderboardResponse>();
                 }
                 else
@@ -197,7 +208,7 @@ namespace API.Services
                     cachedData = await _cache.GetAsync($"leaderboard:speed:{activityId}");
                     if (cachedData != null)
                     {
-                        return System.Text.Json.JsonSerializer.Deserialize<List<TimeLeaderboardResponse>>(cachedData)
+                        return JsonSerializer.Deserialize<List<TimeLeaderboardResponse>>(cachedData)
                             ?? new List<TimeLeaderboardResponse>();
                     }
                     else
@@ -220,7 +231,7 @@ namespace API.Services
                 var cachedData = await _cache.GetAsync($"leaderboard:totalTime:{activityId}");
                 if (cachedData != null)
                 {
-                    return System.Text.Json.JsonSerializer.Deserialize<List<TimeLeaderboardResponse>>(cachedData)
+                    return JsonSerializer.Deserialize<List<TimeLeaderboardResponse>>(cachedData)
                         ?? new List<TimeLeaderboardResponse>();
                 }
                 else
@@ -229,7 +240,7 @@ namespace API.Services
                     cachedData = await _cache.GetAsync($"leaderboard:totalTime:{activityId}");
                     if (cachedData != null)
                     {
-                        return System.Text.Json.JsonSerializer.Deserialize<List<TimeLeaderboardResponse>>(cachedData)
+                        return JsonSerializer.Deserialize<List<TimeLeaderboardResponse>>(cachedData)
                             ?? new List<TimeLeaderboardResponse>();
                     }
                     else
@@ -276,7 +287,7 @@ namespace API.Services
                         })
                     .ToListAsync();
 
-                await _cache.SetAsync($"leaderboard:completions:{activityId}", System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(leaderboard), new DistributedCacheEntryOptions
+                await _cache.SetAsync($"leaderboard:completions:{activityId}", JsonSerializer.SerializeToUtf8Bytes(leaderboard), new DistributedCacheEntryOptions
                 {
                     AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(1).Add(TimeSpan.FromHours(1))
                 });
@@ -317,7 +328,7 @@ namespace API.Services
                             Time = g.BestTime
                         })
                     .ToListAsync();
-                await _cache.SetAsync($"leaderboard:speed:{activityId}", System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(leaderboard), new DistributedCacheEntryOptions
+                await _cache.SetAsync($"leaderboard:speed:{activityId}", JsonSerializer.SerializeToUtf8Bytes(leaderboard), new DistributedCacheEntryOptions
                 {
                     AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(1).Add(TimeSpan.FromHours(1))
                 });
@@ -357,9 +368,9 @@ namespace API.Services
                             Time = TimeSpan.FromSeconds(g.TotalTime)
                         })
                     .ToListAsync();
-                await _cache.SetAsync($"leaderboard:totalTime:{activityId}", System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(leaderboard), new DistributedCacheEntryOptions 
-                { 
-                    AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(1).Add(TimeSpan.FromHours(1)) 
+                await _cache.SetAsync($"leaderboard:totalTime:{activityId}", JsonSerializer.SerializeToUtf8Bytes(leaderboard), new DistributedCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(1).Add(TimeSpan.FromHours(1))
                 });
             }
             catch (Exception ex)

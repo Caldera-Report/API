@@ -37,7 +37,7 @@ public class ActivityFunctions
     }
 
     [Function("CacheActivities")]
-    public async Task CacheActivities([TimerTrigger("0 0 * * * *")] TimerInfo timer)
+    public async Task CacheActivities([TimerTrigger("0 0 0 * * *")] TimerInfo timer)
     {
         try
         {
@@ -94,7 +94,7 @@ public class ActivityFunctions
     }
 
     [Function("ComputeLeaderboards")]
-    public async Task ComputeLeaderboards([TimerTrigger("0 0 * * * *")] TimerInfo timer)
+    public async Task ComputeLeaderboards([TimerTrigger("0 0 0 * * *")] TimerInfo timer)
     {
         try
         {
