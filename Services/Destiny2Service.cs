@@ -28,14 +28,14 @@ namespace API.Services
         {
             var hasBungieId = playerName.Length > 5 && playerName[^5] == '#';
 
-            var response = hasBungieId ? 
+            var response = hasBungieId ?
                 await SearchByBungieName(playerName) :
                 await SearchByPrefix(playerName);
 
             var filteredMemberships = response
                     .Where(m => m.applicableMembershipTypes.Count > 0)
                     .Select(m => new PlayerSearchDto
-                    { 
+                    {
                         Id = long.Parse(m.membershipId),
                         MembershipType = m.membershipType,
                         FullDisplayName = m.bungieGlobalDisplayName + "#" + m.bungieGlobalDisplayNameCode
