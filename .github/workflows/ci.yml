@@ -31,16 +31,16 @@ jobs:
             ${{ runner.os }}-nuget-
 
       - name: Restore dependencies
-        run: dotnet restore Worker.sln
+        run: dotnet restore API.sln
 
       - name: Enforce formatting
-        run: dotnet format Worker.sln --verify-no-changes
+        run: dotnet format API.sln --verify-no-changes
 
       - name: Build
-        run: dotnet build Worker.sln --configuration Release --no-restore
+        run: dotnet build API.sln --configuration Release --no-restore
 
       - name: Run tests
-        run: dotnet test Worker.sln --configuration Release --no-build --verbosity normal
+        run: dotnet test API.sln --configuration Release --no-build --verbosity normal
 
       - name: Check for vulnerable packages
-        run: dotnet list Worker.sln package --vulnerable --include-transitive
+        run: dotnet list API.sln package --vulnerable --include-transitive
