@@ -30,14 +30,6 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Remove existing GitHub NuGet source (if any)
-        shell: pwsh
-        run: dotnet nuget remove source "github" || $true
-
-      - name: Add NuGet source for GitHub Packages
-        shell: pwsh
-        run: dotnet nuget add source "https://nuget.pkg.github.com/Caldera-Report/index.json" --name "github" --username "${{ github.actor }}" --password "${{ secrets.PACKAGES_TOKEN }}" --store-password-in-clear-text
-
       - name: Restore all packages
         shell: pwsh
         run: dotnet restore './${{ env.FUNCTIONS_PROJECT_FILE }}'
