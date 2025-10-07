@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 9
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+          dotnet-quality: ga
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore dependencies
+        run: dotnet restore API.sln
+
+      - name: Enforce formatting
+        run: dotnet format API.sln --verify-no-changes
+
+      - name: Build
+        run: dotnet build API.sln --configuration Release --no-restore
+
+      - name: Run tests
+        run: dotnet test API.sln --configuration Release --no-build --verbosity normal
+
+      - name: Check for vulnerable packages
+        run: dotnet list API.sln package --vulnerable --include-transitive

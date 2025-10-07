@@ -10,8 +10,9 @@ on:
   workflow_dispatch:
 
 env:
-  AZURE_FUNCTIONAPP_PACKAGE_PATH: '.' # set this to the path to your web app project, defaults to the repository root
-  DOTNET_VERSION: '9.0.x' # set this to the dotnet version to use
+  DOTNET_VERSION: "9.0.x" # set this to the dotnet version to use
+  FUNCTIONS_PROJECT_FILE: "API.csproj"
+  AZURE_FUNCTIONAPP_PACKAGE_PATH: "./publish"
 
 jobs:
   build-and-deploy:
@@ -21,30 +22,34 @@ jobs:
       contents: read #This is required for actions/checkout
 
     steps:
-      - name: 'Checkout GitHub Action'
+      - name: "Checkout GitHub Action"
         uses: actions/checkout@v4
 
       - name: Setup DotNet ${{ env.DOTNET_VERSION }} Environment
         uses: actions/setup-dotnet@v1
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
-        
+
       - name: Remove existing GitHub NuGet source (if any)
-        run: dotnet nuget remove source "github" || true
-        
+        shell: pwsh
+        run: dotnet nuget remove source "github" || $true
+
       - name: Add NuGet source for GitHub Packages
+        shell: pwsh
         run: dotnet nuget add source "https://nuget.pkg.github.com/Caldera-Report/index.json" --name "github" --username "${{ github.actor }}" --password "${{ secrets.PACKAGES_TOKEN }}" --store-password-in-clear-text
 
       - name: Restore all packages
-        run: dotnet restore './${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
-
-      - name: 'Resolve Project Dependencies Using Dotnet'
         shell: pwsh
-        run: |
-          pushd './${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
-          dotnet build --configuration Release --output ./output
-          popd
-      
+        run: dotnet restore './${{ env.FUNCTIONS_PROJECT_FILE }}'
+
+      - name: Run unit tests
+        shell: pwsh
+        run: dotnet test './API.Tests/API.Tests.csproj' --configuration Release
+
+      - name: Build and publish
+        shell: pwsh
+        run: dotnet publish './${{ env.FUNCTIONS_PROJECT_FILE }}' --configuration Release --output './${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
+
       - name: Login to Azure
         uses: azure/login@v2
         with:
@@ -52,11 +57,10 @@ jobs:
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_5349ED5C1A6E40159B0332441DE73E2A }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_FA55155A7E3246CFBF9D9758F6D1C459 }}
 
-      - name: 'Run Azure Functions Action'
+      - name: "Run Azure Functions Action"
         uses: Azure/functions-action@v1
         id: fa
         with:
-          app-name: 'caldera-report-api'
-          slot-name: 'Production'
-          package: '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/output'
-          
+          app-name: "caldera-report-api"
+          slot-name: "Production"
+          package: "${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}"
