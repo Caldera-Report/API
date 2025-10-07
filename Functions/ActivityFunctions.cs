@@ -71,7 +71,8 @@ public class ActivityFunctions
         {
             var leaderboard = await _queryService.GetSpeedLeaderboardAsync(activityId);
             return ResponseHelpers.CachedJson(req, leaderboard, _jsonOptions, 300);
-        } catch (Exception ex)
+        }
+        catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving speed leaderboard");
             return new StatusCodeResult(500);

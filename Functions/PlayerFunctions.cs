@@ -30,7 +30,8 @@ public class PlayerFunctions
     {
         var playerName = request.playerName;
         _logger.LogInformation($"Search request for {playerName}");
-        if (string.IsNullOrEmpty(playerName)) {
+        if (string.IsNullOrEmpty(playerName))
+        {
             return new BadRequestObjectResult("Player name is required");
         }
         try
@@ -94,7 +95,7 @@ public class PlayerFunctions
     public async Task<IActionResult> GetPlayerStatsForActivity([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "players/{membershipId}/stats/{activityId}")] HttpRequest req, long membershipId, long activityId)
     {
         _logger.LogInformation($"Get stats for activity request recieved for player {membershipId} for activity {activityId}");
-        
+
         try
         {
             var reports = await _queryService.GetPlayerReportsForActivityAsync(membershipId, activityId);
