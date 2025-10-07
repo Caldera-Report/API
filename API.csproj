@@ -11,8 +11,13 @@
     <Content Include="local.settings.json" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Remove="API.Tests/**/*.cs" />
+    <EmbeddedResource Remove="API.Tests/**/*" />
+    <None Remove="API.Tests/**/*" />
+  </ItemGroup>
+  <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
-    <PackageReference Include="Classes" Version="1.5.13" />
+    <PackageReference Include="CalderaReport.Classes" Version="1.0.0" />
     <PackageReference Include="Facet" Version="2.8.1" />
     <PackageReference Include="Facet.Extensions" Version="2.8.1" />
     <PackageReference Include="Facet.Extensions.EFCore" Version="2.8.1" />
