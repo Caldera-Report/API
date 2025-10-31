@@ -48,7 +48,7 @@ await Host.CreateDefaultBuilder(args)
             });
 
             options.EnableServiceProviderCaching();
-            options.EnableSensitiveDataLogging(ctx.HostingEnvironment.IsDevelopment());
+            options.EnableSensitiveDataLogging(true);
         });
 
         services.AddOptions<Destiny2Options>()
