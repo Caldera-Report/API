@@ -7,11 +7,16 @@ on:
   push:
     branches:
       - master
+    paths:
+      - "API/**"
+      - "API.Tests/**"
+      - "Domain/**"
+      - ".github/workflows/master_caldera-report-api.yml"
   workflow_dispatch:
 
 env:
   DOTNET_VERSION: "9.0.x" # set this to the dotnet version to use
-  FUNCTIONS_PROJECT_FILE: "API.csproj"
+  FUNCTIONS_PROJECT_FILE: "API/API.csproj"
   AZURE_FUNCTIONAPP_PACKAGE_PATH: "./publish"
 
 jobs:

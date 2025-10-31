@@ -26,7 +26,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\API.csproj" Aliases="global,APIAssembly" />
+    <ProjectReference Include="..\API\API.csproj">
+      <Aliases>APIAssembly</Aliases>
+    </ProjectReference>
+    <ProjectReference Include="..\Domain\Domain.csproj" />
   </ItemGroup>
 
 </Project>
