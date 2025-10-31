@@ -1,16 +1,18 @@
 extern alias APIAssembly;
-
+using API.Domain.DTO.Responses;
+using API.Models.Responses;
 using APIAssembly::API.Functions;
-using APIAssembly::API.Models.Responses;
 using APIAssembly::API.Services.Abstract;
-using Classes.DB;
-using Classes.DestinyApi;
-using SearchRequest = APIAssembly::Classes.DTO.SearchRequest;
+using Domain.DB;
+using Domain.DestinyApi;
+using Domain.DTO.Requests;
+using Domain.DTO.Responses;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
 using System.Text.Json;
+using It = Moq.It;
 
 namespace API.Tests.Functions;
 
@@ -132,7 +134,7 @@ public class PlayerFunctionsTests
     {
         var reports = new ActivityReportListDTO
         {
-            Reports = new List<ActivityReportDto> { new() }
+            Reports = new List<ActivityReportPlayerFacet> { new() }
         };
         _queryService.Setup(q => q.GetPlayerReportsForActivityAsync(1, 2)).ReturnsAsync(reports);
         var context = new DefaultHttpContext();
@@ -170,6 +172,7 @@ public class PlayerFunctionsTests
     {
         var player = new Player
         {
+            Id = 15,
             DisplayName = "Tester",
             DisplayNameCode = 123,
             LastUpdateCompleted = DateTime.UtcNow,
@@ -181,8 +184,9 @@ public class PlayerFunctionsTests
 
         Assert.IsType<NoContentResult>(result);
         _destiny2Service.Verify(s => s.GetCharactersForPlayer(Moq.It.IsAny<long>(), Moq.It.IsAny<int>()), Times.Never);
-        _destiny2Service.Verify(s => s.LoadPlayerActivityReports(Moq.It.IsAny<Player>(), Moq.It.IsAny<string>()), Times.Never);
+        _destiny2Service.Verify(s => s.LoadPlayerActivityReports(Moq.It.IsAny<Player>(), It.IsAny<DateTime>(), It.IsAny<string>()), Times.Never);
         _queryService.Verify(q => q.UpdatePlayerEmblems(Moq.It.IsAny<Player>(), Moq.It.IsAny<string>(), Moq.It.IsAny<string>()), Times.Never);
+        _queryService.Verify(q => q.GetPlayerLastPlayedActivityDate(It.IsAny<long>()), Times.Never);
     }
 
     [Fact]
@@ -190,12 +194,15 @@ public class PlayerFunctionsTests
     {
         var player = new Player
         {
+            Id = 20,
             DisplayName = "Tester",
             DisplayNameCode = 123,
             LastUpdateCompleted = DateTime.UtcNow.AddHours(-1),
             MembershipType = 2
         };
         _queryService.Setup(q => q.GetPlayerDbObject(20)).ReturnsAsync(player);
+        var lastPlayedActivity = DateTime.UtcNow.AddDays(-1);
+        _queryService.Setup(q => q.GetPlayerLastPlayedActivityDate(20)).ReturnsAsync(lastPlayedActivity);
 
         var older = new DestinyCharacterComponent
         {
@@ -215,7 +222,7 @@ public class PlayerFunctionsTests
             ["222"] = newer
         };
         _destiny2Service.Setup(s => s.GetCharactersForPlayer(20, 2)).ReturnsAsync(characters);
-        _destiny2Service.Setup(s => s.LoadPlayerActivityReports(player, Moq.It.IsAny<string>())).Returns(Task.CompletedTask);
+        _destiny2Service.Setup(s => s.LoadPlayerActivityReports(player, It.IsAny<DateTime>(), It.IsAny<string>())).Returns(Task.CompletedTask);
         _queryService.Setup(q => q.UpdatePlayerEmblems(player, Moq.It.IsAny<string>(), Moq.It.IsAny<string>())).Returns(Task.CompletedTask);
 
         var result = await _functions.LoadPlayerActivities(new DefaultHttpContext().Request, 20);
@@ -223,8 +230,9 @@ public class PlayerFunctionsTests
         var okResult = Assert.IsType<OkObjectResult>(result);
         Assert.Equivalent(new { Success = true }, okResult.Value);
         _destiny2Service.Verify(s => s.GetCharactersForPlayer(20, 2), Times.Once);
-        _destiny2Service.Verify(s => s.LoadPlayerActivityReports(player, "111"), Times.Once);
-        _destiny2Service.Verify(s => s.LoadPlayerActivityReports(player, "222"), Times.Once);
+        _queryService.Verify(q => q.GetPlayerLastPlayedActivityDate(20), Times.Once);
+        _destiny2Service.Verify(s => s.LoadPlayerActivityReports(player, lastPlayedActivity, "111"), Times.Once);
+        _destiny2Service.Verify(s => s.LoadPlayerActivityReports(player, lastPlayedActivity, "222"), Times.Once);
         _queryService.Verify(q => q.UpdatePlayerEmblems(player, "bg-new", "emblem-new"), Times.Once);
     }
 

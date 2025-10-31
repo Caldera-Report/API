@@ -1,8 +1,8 @@
 extern alias APIAssembly;
-
+using API.Models.Responses;
 using APIAssembly::API.Functions;
-using APIAssembly::API.Models.Responses;
 using APIAssembly::API.Services.Abstract;
+using Domain.DTO.Responses;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -175,25 +175,135 @@ public class ActivityFunctionsTests
             }
         };
         _queryService.Setup(q => q.GetAllActivitiesAsync()).ReturnsAsync(activities);
+        _queryService.Setup(q => q.ComputeCompletionsLeaderboardAsync(It.IsAny<long>())).Returns(Task.CompletedTask);
+        _queryService.Setup(q => q.ComputeSpeedLeaderboardAsync(It.IsAny<long>())).Returns(Task.CompletedTask);
+        _queryService.Setup(q => q.ComputeTotalTimeLeaderboardAsync(It.IsAny<long>())).Returns(Task.CompletedTask);
 
-        await _functions.ComputeLeaderboards(default!);
+        var context = new DefaultHttpContext();
 
+        var result = await _functions.ComputeLeaderboards(context.Request);
+
+        Assert.IsType<OkResult>(result);
         _queryService.Verify(q => q.ComputeCompletionsLeaderboardAsync(11), Times.Once);
         _queryService.Verify(q => q.ComputeSpeedLeaderboardAsync(11), Times.Once);
         _queryService.Verify(q => q.ComputeTotalTimeLeaderboardAsync(11), Times.Once);
         _queryService.Verify(q => q.ComputeCompletionsLeaderboardAsync(22), Times.Once);
         _queryService.Verify(q => q.ComputeSpeedLeaderboardAsync(22), Times.Once);
         _queryService.Verify(q => q.ComputeTotalTimeLeaderboardAsync(22), Times.Once);
-        _queryService.Verify(q => q.ComputeCompletionsLeaderboardAsync(0), Times.Once);
-        _queryService.Verify(q => q.ComputeSpeedLeaderboardAsync(0), Times.Once);
-        _queryService.Verify(q => q.ComputeTotalTimeLeaderboardAsync(0), Times.Once);
     }
 
     [Fact]
-    public async Task ComputeLeaderboards_SwallowsExceptions()
+    public async Task ComputeLeaderboards_ReturnsUnauthorized_WhenSecurityKeyMismatch()
+    {
+        using var _ = UseEnvironmentVariable("SecurityKey:ComputeLeaderboard", "expected");
+        var context = new DefaultHttpContext();
+        context.Request.Headers["x-security-key"] = "wrong";
+
+        var result = await _functions.ComputeLeaderboards(context.Request);
+
+        var status = Assert.IsType<StatusCodeResult>(result);
+        Assert.Equal(StatusCodes.Status401Unauthorized, status.StatusCode);
+        _queryService.Verify(q => q.GetAllActivitiesAsync(), Times.Never);
+    }
+
+    [Fact]
+    public async Task ComputeLeaderboards_ReturnsOk_WhenSecurityKeyMatches()
+    {
+        var activities = new List<OpTypeDto>
+        {
+            new()
+            {
+                Activities = new[]
+                {
+                    new ActivityDto { Id = 31 }
+                }
+            }
+        };
+        _queryService.Setup(q => q.GetAllActivitiesAsync()).ReturnsAsync(activities);
+        _queryService.Setup(q => q.ComputeCompletionsLeaderboardAsync(It.IsAny<long>())).Returns(Task.CompletedTask);
+        _queryService.Setup(q => q.ComputeSpeedLeaderboardAsync(It.IsAny<long>())).Returns(Task.CompletedTask);
+        _queryService.Setup(q => q.ComputeTotalTimeLeaderboardAsync(It.IsAny<long>())).Returns(Task.CompletedTask);
+
+        using var _ = UseEnvironmentVariable("SecurityKey:ComputeLeaderboard", "secret");
+        var context = new DefaultHttpContext();
+        context.Request.Headers["x-security-key"] = "secret";
+
+        var result = await _functions.ComputeLeaderboards(context.Request);
+
+        Assert.IsType<OkResult>(result);
+        _queryService.Verify(q => q.GetAllActivitiesAsync(), Times.Once);
+        _queryService.Verify(q => q.ComputeCompletionsLeaderboardAsync(31), Times.Once);
+        _queryService.Verify(q => q.ComputeSpeedLeaderboardAsync(31), Times.Once);
+        _queryService.Verify(q => q.ComputeTotalTimeLeaderboardAsync(31), Times.Once);
+    }
+
+    [Fact]
+    public async Task ComputeLeaderboards_ReturnsServerError_OnException()
+    {
+        _queryService.Setup(q => q.GetAllActivitiesAsync()).ThrowsAsync(new Exception());
+        var context = new DefaultHttpContext();
+
+        var result = await _functions.ComputeLeaderboards(context.Request);
+
+        var status = Assert.IsType<StatusCodeResult>(result);
+        Assert.Equal(StatusCodes.Status500InternalServerError, status.StatusCode);
+    }
+
+    [Fact]
+    public async Task ComputeLeaderboardsTimer_ProcessesAllIds()
+    {
+        var activities = new List<OpTypeDto>
+        {
+            new()
+            {
+                Activities = new[]
+                {
+                    new ActivityDto { Id = 99 },
+                    new ActivityDto { Id = 100 }
+                }
+            }
+        };
+        _queryService.Setup(q => q.GetAllActivitiesAsync()).ReturnsAsync(activities);
+        _queryService.Setup(q => q.ComputeCompletionsLeaderboardAsync(It.IsAny<long>())).Returns(Task.CompletedTask);
+        _queryService.Setup(q => q.ComputeSpeedLeaderboardAsync(It.IsAny<long>())).Returns(Task.CompletedTask);
+        _queryService.Setup(q => q.ComputeTotalTimeLeaderboardAsync(It.IsAny<long>())).Returns(Task.CompletedTask);
+
+        await _functions.ComputeLeaderboardsTimer(default!);
+
+        _queryService.Verify(q => q.ComputeCompletionsLeaderboardAsync(99), Times.Once);
+        _queryService.Verify(q => q.ComputeSpeedLeaderboardAsync(99), Times.Once);
+        _queryService.Verify(q => q.ComputeTotalTimeLeaderboardAsync(99), Times.Once);
+        _queryService.Verify(q => q.ComputeCompletionsLeaderboardAsync(100), Times.Once);
+        _queryService.Verify(q => q.ComputeSpeedLeaderboardAsync(100), Times.Once);
+        _queryService.Verify(q => q.ComputeTotalTimeLeaderboardAsync(100), Times.Once);
+    }
+
+    [Fact]
+    public async Task ComputeLeaderboardsTimer_SwallowsExceptions()
     {
         _queryService.Setup(q => q.GetAllActivitiesAsync()).ThrowsAsync(new Exception());
 
-        await _functions.ComputeLeaderboards(default!);
+        await _functions.ComputeLeaderboardsTimer(default!);
+    }
+
+    private static IDisposable UseEnvironmentVariable(string name, string? value)
+    {
+        var original = Environment.GetEnvironmentVariable(name);
+        Environment.SetEnvironmentVariable(name, value);
+        return new EnvironmentVariableScope(name, original);
+    }
+
+    private sealed class EnvironmentVariableScope : IDisposable
+    {
+        private readonly string _name;
+        private readonly string? _value;
+
+        public EnvironmentVariableScope(string name, string? value)
+        {
+            _name = name;
+            _value = value;
+        }
+
+        public void Dispose() => Environment.SetEnvironmentVariable(_name, _value);
     }
 }
