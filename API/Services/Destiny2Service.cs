@@ -257,7 +257,7 @@ namespace API.Services
                                 }
                             });
                         }
-                        else if (existing.NeedsFullCheck)
+                        else if (existing.NeedsFullCheck && !existing.Players.Any(p => p.PlayerId == player.Id))
                         {
                             existing.Players.Add(new ActivityReportPlayer
                             {

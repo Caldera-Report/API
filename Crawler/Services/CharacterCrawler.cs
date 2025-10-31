@@ -83,7 +83,7 @@ namespace Crawler.Services
                 var player = await context.Players.FindAsync(item.PlayerId, ct) ?? throw new InvalidDataException($"Player with Id {item.PlayerId} cannot be found");
                 var lastPlayedDate = await context.ActivityReports
                     .AsNoTracking()
-                    .Where(r => r.Players.Any(p => p.PlayerId == item.PlayerId))
+                    .Where(r => r.Players.Any(p => p.PlayerId == item.PlayerId) && !r.NeedsFullCheck)
                     .OrderByDescending(r => r.Date)
                     .Select(r => (DateTime?)r.Date)
                     .FirstOrDefaultAsync(ct);
