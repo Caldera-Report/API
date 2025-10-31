@@ -16,6 +16,7 @@ namespace Crawler.Services
         private readonly ILogger<PgcrProcessor> _logger;
 
         private const int MaxConcurrentTasks = 25;
+        private static readonly SemaphoreSlim _playerInsertSemaphore = new(1, 1);
 
         public PgcrProcessor(ChannelReader<PostGameCarnageReportData> input, IConnectionMultiplexer redis, IDbContextFactory<AppDbContext> contextFactory, ILogger<PgcrProcessor> logger)
         {
@@ -113,46 +114,59 @@ namespace Crawler.Services
                     .Distinct()
                     .ToList();
 
-                var existingPlayerIds = await context.Players
-                    .Where(p => playerIds.Contains(p.Id))
-                    .Select(p => p.Id)
-                    .ToListAsync(ct);
+                var existingPlayerIds = playerIds.Count > 0
+                    ? await context.Players
+                        .Where(p => playerIds.Contains(p.Id))
+                        .Select(p => p.Id)
+                        .ToListAsync(ct)
+                    : new List<long>();
 
-                var newPlayers = playerIds
+                var missingPlayerIds = playerIds
                     .Except(existingPlayerIds)
-                    .Select(pid =>
-                    {
-                        var entry = publicEntries.First(e => long.Parse(e.player.destinyUserInfo.membershipId) == pid);
-                        return new Player
-                        {
-                            Id = pid,
-                            MembershipType = (int)entry.player.destinyUserInfo.membershipType,
-                            DisplayName = entry.player.destinyUserInfo.displayName,
-                            DisplayNameCode = entry.player.destinyUserInfo.bungieGlobalDisplayNameCode
-                        };
-                    })
                     .ToList();
+                var newPlayers = new List<Player>();
 
-                if (newPlayers.Count > 0)
+                if (missingPlayerIds.Count > 0)
                 {
-                    context.Players.AddRange(newPlayers);
+                    await _playerInsertSemaphore.WaitAsync(ct);
                     try
                     {
-                        await context.SaveChangesAsync(ct);
-                        existingPlayerIds.AddRange(newPlayers.Select(p => p.Id));
-                    }
-                    catch (DbUpdateException ex)
-                    {
-                        _logger.LogWarning(ex, "Duplicate player detected while inserting PGCR {ReportId}", reportId);
-
-                        context.ChangeTracker.Clear();
-
-                        existingPlayerIds = await context.Players
+                        var refreshedExistingPlayerIds = await context.Players
                             .Where(p => playerIds.Contains(p.Id))
                             .Select(p => p.Id)
                             .ToListAsync(ct);
 
-                        newPlayers.Clear();
+                        var confirmedMissingPlayerIds = playerIds
+                            .Except(refreshedExistingPlayerIds)
+                            .ToList();
+
+                        if (confirmedMissingPlayerIds.Count > 0)
+                        {
+                            newPlayers = confirmedMissingPlayerIds
+                                .Select(pid =>
+                                {
+                                    var entry = publicEntries.First(e => long.Parse(e.player.destinyUserInfo.membershipId) == pid);
+                                    return new Player
+                                    {
+                                        Id = pid,
+                                        MembershipType = (int)entry.player.destinyUserInfo.membershipType,
+                                        DisplayName = entry.player.destinyUserInfo.displayName,
+                                        DisplayNameCode = entry.player.destinyUserInfo.bungieGlobalDisplayNameCode
+                                    };
+                                })
+                                .ToList();
+
+                            context.Players.AddRange(newPlayers);
+
+                            await context.SaveChangesAsync(ct);
+                            refreshedExistingPlayerIds.AddRange(newPlayers.Select(p => p.Id));
+                        }
+
+                        existingPlayerIds = refreshedExistingPlayerIds;
+                    }
+                    finally
+                    {
+                        _playerInsertSemaphore.Release();
                     }
                 }
 
