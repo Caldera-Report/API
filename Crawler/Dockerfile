@@ -11,7 +11,7 @@ COPY . .
 WORKDIR /src/Crawler
 RUN dotnet publish "Crawler.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false --no-restore
 
-FROM mcr.microsoft.com/dotnet/runtime:9.0 AS final
+FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
 WORKDIR /app
 ENV DOTNET_EnableDiagnostics=0
 RUN useradd --create-home --uid 1001 --shell /usr/sbin/nologin crawler
