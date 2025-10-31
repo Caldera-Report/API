@@ -157,40 +157,42 @@ public class PlayerFunctions
     }
 
     [Function(nameof(TriggerCrawler))]
-    public async Task TriggerCrawler([TimerTrigger("0 0 0 * * *", RunOnStartup = true)] TimerInfo timer)
+    public async Task TriggerCrawler([TimerTrigger("0 0 0 * * *")] TimerInfo timer)
     {
         try
         {
             await _queryService.LoadPlayersQueue();
             await _destiny2Service.GroupActivityDuplicates();
 
-            var credential = new DefaultAzureCredential();
+            //Azure job containers aren't going to work out at least for the first load, so commenting this out for now.
 
-            var armClient = new ArmClient(credential);
+            //var credential = new DefaultAzureCredential();
 
-            var subscription = Environment.GetEnvironmentVariable("AZURE_SUBSCRIPTION_ID");
-            string resourceGroupName = "Caldera-ReportResourceGroup";
-            string jobName = "caldera-report-crawler";
+            //var armClient = new ArmClient(credential);
 
-            var jobResourceId = ContainerAppJobResource.CreateResourceIdentifier(subscription!, resourceGroupName, jobName);
-            var job = armClient.GetContainerAppJobResource(jobResourceId);
+            //var subscription = Environment.GetEnvironmentVariable("AZURE_SUBSCRIPTION_ID");
+            //string resourceGroupName = "Caldera-ReportResourceGroup";
+            //string jobName = "caldera-report-crawler";
 
-            var executions = job.GetContainerAppJobExecutions().ToList();
+            //var jobResourceId = ContainerAppJobResource.CreateResourceIdentifier(subscription!, resourceGroupName, jobName);
+            //var job = armClient.GetContainerAppJobResource(jobResourceId);
 
-            bool isRunning = executions.Any(e =>
-            {
-                var status = e.Data.Status;
-                return status == "Running" || status == "Pending";
-            });
+            //var executions = job.GetContainerAppJobExecutions().ToList();
 
-            if (isRunning)
-            {
-                _logger.LogWarning("A crawler job is already running, skipping new start.");
-                return;
-            }
+            //bool isRunning = executions.Any(e =>
+            //{
+            //    var status = e.Data.Status;
+            //    return status == "Running" || status == "Pending";
+            //});
 
-            _logger.LogInformation("Starting crawler job...");
-            await job.StartAsync(Azure.WaitUntil.Started);
+            //if (isRunning)
+            //{
+            //    _logger.LogWarning("A crawler job is already running, skipping new start.");
+            //    return;
+            //}
+
+            //_logger.LogInformation("Starting crawler job...");
+            //await job.StartAsync(Azure.WaitUntil.Started);
 
             _logger.LogInformation("Crawler job started successfully.");
         }

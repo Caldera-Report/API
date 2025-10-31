@@ -406,7 +406,7 @@ namespace API.Services
             var lastActivity = await _context.ActivityReports
                 .AsNoTracking()
                 .Include(r => r.Players)
-                .Where(r => r.Players.Any(p => p.PlayerId == membershipId))
+                .Where(r => r.Players.Any(p => p.PlayerId == membershipId) && !r.NeedsFullCheck)
                 .OrderByDescending(r => r.Date)
                 .Select(r => (DateTime?)r.Date)
                 .FirstOrDefaultAsync();

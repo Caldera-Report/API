@@ -6,23 +6,20 @@ using Domain.Configuration;
 using Domain.Data;
 using Microsoft.EntityFrameworkCore;
 using StackExchange.Redis;
+using Sentry;
+using Sentry.Extensions.Logging;
 
 await Host.CreateDefaultBuilder(args)
     .ConfigureLogging((ctx, logging) =>
     {
         logging.AddConsole();
-
-        logging.Services.Configure<LoggerFilterOptions>(options =>
+        logging.AddSentry(options =>
         {
-            var aiRule = options.Rules.FirstOrDefault(rule =>
-                rule.ProviderName == "Microsoft.Extensions.Logging.ApplicationInsights.ApplicationInsightsLoggerProvider");
-            if (aiRule is not null)
-            {
-                options.Rules.Remove(aiRule);
-            }
+            ctx.Configuration.GetSection("Sentry").Bind(options);
 
-            options.AddFilter("Microsoft.Extensions.Logging.ApplicationInsights.ApplicationInsightsLoggerProvider",
-                LogLevel.Information);
+            options.Dsn ??= Environment.GetEnvironmentVariable("SENTRY_DSN");
+            options.Environment = ctx.HostingEnvironment.EnvironmentName;
+            options.Debug = ctx.HostingEnvironment.IsDevelopment();
         });
 
         if (ctx.HostingEnvironment.IsDevelopment())
@@ -36,8 +33,6 @@ await Host.CreateDefaultBuilder(args)
     })
     .ConfigureServices((ctx, services) =>
     {
-        services.AddApplicationInsightsTelemetryWorkerService();
-
         services.AddSingleton<IConnectionMultiplexer>(
             ConnectionMultiplexer.Connect(ctx.Configuration.GetConnectionString("RedisConnectionString") ?? throw new InvalidOperationException("Redis connection string is not configured"))
         );
