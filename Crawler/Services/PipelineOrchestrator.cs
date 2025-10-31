@@ -1,10 +1,6 @@
 using Domain.DestinyApi;
 using Domain.DTO;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
-using System.Net.Http;
 using System.Threading.Channels;
 
 namespace Crawler.Services
@@ -14,12 +10,14 @@ namespace Crawler.Services
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<PipelineOrchestrator> _logger;
         private readonly IHostEnvironment _env;
+        private readonly IHostApplicationLifetime _appLifetime;
 
-        public PipelineOrchestrator(ILogger<PipelineOrchestrator> logger, IServiceProvider serviceProvider, IHostEnvironment env)
+        public PipelineOrchestrator(ILogger<PipelineOrchestrator> logger, IServiceProvider serviceProvider, IHostEnvironment env, IHostApplicationLifetime applicationLifetime)
         {
             _logger = logger;
             _serviceProvider = serviceProvider;
             _env = env;
+            _appLifetime = applicationLifetime;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -84,6 +82,7 @@ namespace Crawler.Services
                 }
 
                 _logger.LogInformation("Pipeline orchestration completed successfully.");
+                _appLifetime.StopApplication();
             }
             catch (OperationCanceledException)
             {
