@@ -16,7 +16,6 @@ namespace API.Domain.DTO.Responses
 
     [Facet(typeof(ActivityReportPlayer),
         exclude: [nameof(ActivityReportPlayer.Player),
-        nameof(ActivityReportPlayer.Id),
         nameof(ActivityReportPlayer.ActivityReport),
         nameof(ActivityReportPlayer.ActivityReportId)],
         Configuration = typeof(ActivityReportPlayerMapConfig)

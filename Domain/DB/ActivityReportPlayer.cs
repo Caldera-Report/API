@@ -2,7 +2,6 @@
 {
     public class ActivityReportPlayer
     {
-        public int Id { get; set; }
         public long PlayerId { get; set; }
         public long ActivityReportId { get; set; }
         public int Score { get; set; }
