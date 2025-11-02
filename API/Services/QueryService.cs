@@ -29,16 +29,9 @@ namespace API.Services
         {
             try
             {
-                var players = await _cache.StringGetAsync("players:all");
-                if (players.HasValue)
-                    return JsonSerializer.Deserialize<List<PlayerSearchDto>>(players!)!;
-                else
-                {
-                    var playerList = await _context.Players
-                        .ToFacetsAsync<PlayerSearchDto>();
-                    await _cache.StringSetAsync("players:all", JsonSerializer.SerializeToUtf8Bytes(playerList), new TimeSpan(1, 0, 0));
-                    return playerList;
-                }
+                return await _context.Players
+                    .Select(PlayerSearchDto.Projection)
+                    .ToListAsync();
             }
             catch (Exception ex)
             {
