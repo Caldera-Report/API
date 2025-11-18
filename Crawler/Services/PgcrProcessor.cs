@@ -24,6 +24,8 @@ namespace Crawler.Services
         private const int MaxConcurrentTasks = 25;
         private static readonly SemaphoreSlim _playerInsertSemaphore = new(1, 1);
 
+        private static readonly ConcurrentDictionary<long, byte> _inFlightReports = new();
+
         public PgcrProcessor(ChannelReader<PgcrWorkItem> input, IConnectionMultiplexer redis, IDbContextFactory<AppDbContext> contextFactory, ILogger<PgcrProcessor> logger, ConcurrentDictionary<long, int> playerActivityCount)
         {
             _input = input;
@@ -85,13 +87,20 @@ namespace Crawler.Services
             using var activity = CrawlerTelemetry.StartActivity("PgcrProcessor.ProcessPgcr");
             activity?.SetTag("crawler.player.id", item.PlayerId);
             activity?.SetTag("crawler.pgcr.id", item.Pgcr.activityDetails.instanceId);
+
+            var pgcr = item.Pgcr;
+            var reportId = long.Parse(pgcr.activityDetails.instanceId);
+
+            if (!_inFlightReports.TryAdd(reportId, 0))
+            {
+                _logger.LogDebug("Skipping PGCR {ReportId} - already processing", reportId);
+                return;
+            }
+
             try
             {
                 await using var context = await _contextFactory.CreateDbContextAsync(ct);
 
-                var pgcr = item.Pgcr;
-
-                var reportId = long.Parse(pgcr.activityDetails.instanceId);
                 var existing = await context.ActivityReports.FirstOrDefaultAsync(ar => ar.Id == reportId, ct);
                 if (existing != null && !existing.NeedsFullCheck)
                 {
@@ -185,22 +194,25 @@ namespace Crawler.Services
                                 context.PlayerCrawlQueue.Add(new PlayerCrawlQueue { PlayerId = np.Id });
                             }
                         }
+                        await context.SaveChangesAsync(ct);
                     }
                     finally
                     {
                         _playerInsertSemaphore.Release();
                     }
 
-                    foreach (var entry in publicEntries)
+                    var grouped = publicEntries.GroupBy(e => long.Parse(e.player.destinyUserInfo.membershipId)).ToDictionary(g => g.Key, g => g.ToList());
+
+                    foreach (var group in grouped)
                     {
-                        var membershipId = long.Parse(entry.player.destinyUserInfo.membershipId);
+                        var membershipId = group.Key;
                         context.ActivityReportPlayers.Add(new ActivityReportPlayer
                         {
                             PlayerId = membershipId,
                             ActivityReportId = reportId,
-                            Score = (int)entry.values.score.basic.value,
-                            Completed = entry.values.completed.basic.value == 1 && entry.values.completionReason.basic.value != 2.0,
-                            Duration = TimeSpan.FromSeconds(entry.values.activityDurationSeconds.basic.value)
+                            Score = group.Value.Sum(e => (int)e.values.score.basic.value),
+                            Completed = group.Value.All(e => e.values.completed.basic.value == 1 && e.values.completionReason.basic.value != 2.0),
+                            Duration = TimeSpan.FromSeconds(group.Value.Sum(e => e.values.activityDurationSeconds.basic.value))
                         });
                     }
                 }
@@ -227,7 +239,10 @@ namespace Crawler.Services
                 {
                     TryRemovePlayerActivityCount(item.PlayerId);
                 }
-
+            }
+            finally
+            {
+                _inFlightReports.TryRemove(reportId, out _);
             }
         }
 
