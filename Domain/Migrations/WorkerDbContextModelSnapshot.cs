@@ -48,7 +48,7 @@ namespace Worker.Migrations
 
                     b.HasIndex("OpTypeId");
 
-                    b.ToTable("Activities");
+                    b.ToTable("Activities", (string)null);
                 });
 
             modelBuilder.Entity("Domain.DB.ActivityReport", b =>
@@ -75,7 +75,7 @@ namespace Worker.Migrations
 
                     b.HasIndex("Id", "ActivityId", "Date");
 
-                    b.ToTable("ActivityReports");
+                    b.ToTable("ActivityReports", (string)null);
                 });
 
             modelBuilder.Entity("Domain.DB.ActivityReportPlayer", b =>
@@ -106,7 +106,7 @@ namespace Worker.Migrations
 
                     b.HasIndex("ActivityReportId", "PlayerId", "Score");
 
-                    b.ToTable("ActivityReportPlayers");
+                    b.ToTable("ActivityReportPlayers", (string)null);
                 });
 
             modelBuilder.Entity("Domain.DB.OpType", b =>
@@ -123,7 +123,7 @@ namespace Worker.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("OpTypes");
+                    b.ToTable("OpTypes", (string)null);
                 });
 
             modelBuilder.Entity("Domain.DB.Player", b =>
@@ -157,7 +157,7 @@ namespace Worker.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Players");
+                    b.ToTable("Players", (string)null);
                 });
 
             modelBuilder.Entity("Domain.DB.PlayerCrawlQueue", b =>
@@ -183,7 +183,7 @@ namespace Worker.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("PlayerCrawlQueue");
+                    b.ToTable("PlayerCrawlQueue", (string)null);
                 });
 
             modelBuilder.Entity("Domain.DB.PlayerLeaderboard", b =>
@@ -212,7 +212,7 @@ namespace Worker.Migrations
 
                     b.HasIndex("ActivityId", "LeaderboardType", "Rank");
 
-                    b.ToTable("PlayerLeaderboards");
+                    b.ToTable("PlayerLeaderboards", (string)null);
                 });
 
             modelBuilder.Entity("Domain.DB.Activity", b =>
