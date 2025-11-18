@@ -26,19 +26,19 @@ namespace Crawler.Services
 
         private static readonly ConcurrentDictionary<long, byte> _inFlightReports = new();
 
-        public PgcrProcessor(ChannelReader<PgcrWorkItem> input, IConnectionMultiplexer redis, IDbContextFactory<AppDbContext> contextFactory, ILogger<PgcrProcessor> logger, ConcurrentDictionary<long, int> playerActivityCount)
+        public PgcrProcessor(ChannelReader<PgcrWorkItem> input, 
+            IConnectionMultiplexer redis, 
+            IDbContextFactory<AppDbContext> contextFactory, 
+            ILogger<PgcrProcessor> logger, 
+            ConcurrentDictionary<long, int> playerActivityCount,
+            Dictionary<long, long> activityHashMap)
         {
             _input = input;
             _cache = redis.GetDatabase();
             _contextFactory = contextFactory;
             _logger = logger;
             _playerActivityCount = playerActivityCount;
-
-            var entries = _cache.HashGetAll("activityHashMappings");
-            _activityHashMap = entries.ToDictionary(
-                x => long.TryParse(x.Name, out var nameHash) ? nameHash : 0,
-                x => long.TryParse(x.Value, out var valueHash) ? valueHash : 0
-            );
+            _activityHashMap = activityHashMap;
         }
 
         public async Task RunAsync(CancellationToken ct)

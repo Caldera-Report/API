@@ -14,12 +14,14 @@ namespace API.Functions;
 public class ActivityFunctions
 {
     private readonly IQueryService _queryService;
+    private readonly IDestiny2Service _destiny2Service;
     private readonly JsonSerializerOptions _jsonOptions;
     private readonly ILogger<ActivityFunctions> _logger;
 
-    public ActivityFunctions(IQueryService queryService, ILogger<ActivityFunctions> logger, JsonSerializerOptions jsonSerializerOptions)
+    public ActivityFunctions(IQueryService queryService, IDestiny2Service destiny2Service, ILogger<ActivityFunctions> logger, JsonSerializerOptions jsonSerializerOptions)
     {
         _queryService = queryService;
+        _destiny2Service = destiny2Service;
         _logger = logger;
         _jsonOptions = jsonSerializerOptions;
     }
@@ -113,6 +115,19 @@ public class ActivityFunctions
         {
             _logger.LogError(ex, "Error searching for player leaderboard entries for activity {ActivityId}.", activityId);
             return new StatusCodeResult(500);
+        }
+    }
+
+    [Function(nameof(BuildActivityMappings))]
+    public async Task BuildActivityMappings([TimerTrigger("0 0 11 * * *")] TimerInfo timer)
+    {
+        try
+        {
+            await _destiny2Service.GroupActivityDuplicates();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error Grouping activities.");
         }
     }
 }

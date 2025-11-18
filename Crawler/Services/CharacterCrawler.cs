@@ -36,7 +36,8 @@ namespace Crawler.Services
             ILogger<CharacterCrawler> logger,
             IDbContextFactory<AppDbContext> contextFactory,
             ConcurrentDictionary<long, int> playerActivityCount,
-            ConcurrentDictionary<long, int> playerCharacterWorkCount)
+            ConcurrentDictionary<long, int> playerCharacterWorkCount,
+            Dictionary<long, long> activityHashMap)
         {
             _cache = redis.GetDatabase();
             _client = client;
@@ -46,12 +47,7 @@ namespace Crawler.Services
             _contextFactory = contextFactory;
             _playerActivityCount = playerActivityCount;
             _playerCharacterWorkCount = playerCharacterWorkCount;
-
-            var entries = _cache.HashGetAll("activityHashMappings");
-            _activityHashMap = entries.ToDictionary(
-                x => long.TryParse(x.Name, out var nameHash) ? nameHash : 0,
-                x => long.TryParse(x.Value, out var valueHash) ? valueHash : 0
-            );
+            _activityHashMap = activityHashMap;
         }
 
         public async Task RunAsync(CancellationToken ct)

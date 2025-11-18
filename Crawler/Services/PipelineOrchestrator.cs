@@ -47,6 +47,7 @@ namespace Crawler.Services
                 await cache.ListRightPushAsync("last-update-started", DateTime.UtcNow.ToString("O"));
 
                 await LoadPlayersIntoQueue(ct);
+                var activityHashMap = await GetActivityHashMappings(cache);
 
                 var characterChannel = Channel.CreateBounded<CharacterWorkItem>(new BoundedChannelOptions(10) { FullMode = BoundedChannelFullMode.Wait });
                 var activityChannel = Channel.CreateBounded<ActivityReportWorkItem>(new BoundedChannelOptions(30) { FullMode = BoundedChannelFullMode.Wait });
@@ -56,9 +57,9 @@ namespace Crawler.Services
                 var playerCharacterWorkCount = new ConcurrentDictionary<long, int>();
 
                 var playerCrawler = ActivatorUtilities.CreateInstance<PlayerCrawler>(services, characterChannel.Writer, playerCharacterWorkCount);
-                var characterCrawler = ActivatorUtilities.CreateInstance<CharacterCrawler>(services, characterChannel.Reader, activityChannel.Writer, playerActivityCount, playerCharacterWorkCount);
+                var characterCrawler = ActivatorUtilities.CreateInstance<CharacterCrawler>(services, characterChannel.Reader, activityChannel.Writer, playerActivityCount, playerCharacterWorkCount, activityHashMap);
                 var activityCrawler = ActivatorUtilities.CreateInstance<ActivityReportCrawler>(services, activityChannel.Reader, pgcrProcessingChannel.Writer, playerActivityCount);
-                var pgcrProcessor = ActivatorUtilities.CreateInstance<PgcrProcessor>(services, pgcrProcessingChannel.Reader, playerActivityCount);
+                var pgcrProcessor = ActivatorUtilities.CreateInstance<PgcrProcessor>(services, pgcrProcessingChannel.Reader, playerActivityCount, activityHashMap);
 
                 var tasks = new List<Task>
                 {
@@ -119,6 +120,15 @@ namespace Crawler.Services
                 activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
                 throw;
             }
+        }
+
+        private async Task<Dictionary<long, long>> GetActivityHashMappings(IDatabase cache)
+        {
+            var entries = await cache.HashGetAllAsync("activityHashMappings");
+            return entries.ToDictionary(
+                x => long.TryParse(x.Name, out var nameHash) ? nameHash : 0,
+                x => long.TryParse(x.Value, out var valueHash) ? valueHash : 0
+            );
         }
     }
 }

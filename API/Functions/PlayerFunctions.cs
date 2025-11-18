@@ -146,19 +146,4 @@ public class PlayerFunctions
             return new StatusCodeResult(500);
         }
     }
-
-    [Function(nameof(TriggerCrawler))]
-    public async Task TriggerCrawler([TimerTrigger("0 0 0 * * *")] TimerInfo timer)
-    {
-        try
-        {
-            await _destiny2Service.GroupActivityDuplicates();
-
-            _logger.LogInformation("Crawler job started successfully.");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error triggering player crawler job.");
-        }
-    }
 }
