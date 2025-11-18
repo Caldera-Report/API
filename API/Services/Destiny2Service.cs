@@ -98,7 +98,6 @@ namespace API.Services
                     MembershipType = membership.MembershipType,
                     DisplayName = displayName,
                     DisplayNameCode = displayNameCode,
-                    LastUpdateStatus = "N/A"
                 });
             }
 
@@ -161,7 +160,7 @@ namespace API.Services
                 await CheckPlayerName(characters.Response, membershipId);
                 return characters.Response.characters.data;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 throw;
             }
@@ -190,8 +189,6 @@ namespace API.Services
                 x => long.TryParse(x.Value, out var valueHash) ? valueHash : 0
             );
 
-            player.LastUpdateStatus = "Updating";
-            player.LastUpdateStarted = DateTime.UtcNow;
             _context.Players.Update(player);
             await _context.SaveChangesAsync();
 
@@ -283,18 +280,14 @@ namespace API.Services
                     inFlight = prefetchNext;
                 }
 
-                player.LastUpdateStatus = "Complete";
-                player.LastUpdateCompleted = DateTime.UtcNow;
-                player.NeedsFullCheck = false;
+                player.NeedsFullCheck = true;
                 _context.Players.Update(player);
                 await _context.SaveChangesAsync();
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 if (await _context.Players.AsNoTracking().AnyAsync(p => p.Id == player.Id))
                 {
-                    player.LastUpdateStatus = $"Error: {ex.Message}";
-                    player.LastUpdateCompleted = DateTime.UtcNow;
                     _context.Players.Update(player);
                     try { await _context.SaveChangesAsync(); } catch { /* ignore */ }
                 }

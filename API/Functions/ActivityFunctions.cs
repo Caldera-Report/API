@@ -1,11 +1,13 @@
 using API.Helpers;
 using API.Services.Abstract;
+using Domain.DTO.Requests;
+using Domain.Enums;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
-using System.Linq;
 using System.Text.Json;
+using FromBodyAttribute = Microsoft.Azure.Functions.Worker.Http.FromBodyAttribute;
 
 namespace API.Functions;
 
@@ -52,13 +54,29 @@ public class ActivityFunctions
         }
     }
 
-    [Function(nameof(GetCompletionsLeaderboard))]
-    public async Task<IActionResult> GetCompletionsLeaderboard([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "activities/leaderboards/completions/{activityId}")] HttpRequest req, long activityId)
+    [Function(nameof(GetLeaderboard))]
+    public async Task<IActionResult> GetLeaderboard([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "activities/leaderboards/{leaderboardType}/{activityId}")] HttpRequest req, string leaderboardType, long activityId)
     {
         try
         {
             _logger.LogInformation("Retrieving completions leaderboard for {ActivityId}.", activityId);
-            var leaderboard = await _queryService.GetCompletionsLeaderboardAsync(activityId);
+            var queryParams = req.Query;
+            var count = queryParams.ContainsKey("count") && int.TryParse(queryParams["count"], out var parsedCount) ? parsedCount : 250;
+            var offset = queryParams.ContainsKey("offset") && int.TryParse(queryParams["offset"], out var parsedOffset) ? parsedOffset : 0;
+            LeaderboardTypes type;
+            switch (leaderboardType.ToLower())
+            {
+                case "completions":
+                    type = LeaderboardTypes.TotalCompletions;
+                    break;
+                case "speed":
+                    type = LeaderboardTypes.FastestCompletion;
+                    break;
+                default:
+                    type = LeaderboardTypes.HighestScore;
+                    break;
+            }
+            var leaderboard = await _queryService.GetLeaderboardAsync(activityId, type, count, offset);
             return ResponseHelpers.CachedJson(req, leaderboard, _jsonOptions, 300);
         }
         catch (Exception ex)
@@ -68,88 +86,33 @@ public class ActivityFunctions
         }
     }
 
-    [Function(nameof(GetSpeedLeaderboard))]
-    public async Task<IActionResult> GetSpeedLeaderboard([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "activities/leaderboards/speed/{activityId}")] HttpRequest req, long activityId)
+    [Function(nameof(SearchForPlayerLeaderboard))]
+    public async Task<IActionResult> SearchForPlayerLeaderboard([HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "activities/leaderboards/{leaderboardType}/{activityId}/search")] HttpRequest req, string leaderboardType, long activityId, [FromBody] SearchRequest request)
     {
         try
         {
-            _logger.LogInformation("Retrieving speed leaderboard for {ActivityId}.", activityId);
-            var leaderboard = await _queryService.GetSpeedLeaderboardAsync(activityId);
-            return ResponseHelpers.CachedJson(req, leaderboard, _jsonOptions, 300);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving speed leaderboard for {ActivityId}.", activityId);
-            return new StatusCodeResult(500);
-        }
-    }
-
-    [Function(nameof(GetTotalTimeLeaderboard))]
-    public async Task<IActionResult> GetTotalTimeLeaderboard([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "activities/leaderboards/totalTime/{activityId}")] HttpRequest req, long activityId)
-    {
-        try
-        {
-            _logger.LogInformation("Retrieving total time leaderboard for {ActivityId}.", activityId);
-            var leaderboard = await _queryService.GetTotalTimeLeaderboardAsync(activityId);
-            return ResponseHelpers.CachedJson(req, leaderboard, _jsonOptions, 300);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving total time leaderboard for {ActivityId}.", activityId);
-            return new StatusCodeResult(500);
-        }
-    }
-
-    [Function(nameof(ComputeLeaderboards))]
-    public async Task<IActionResult> ComputeLeaderboards([HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "activities/leaderboards/compute")] HttpRequest req)
-    {
-        try
-        {
-            var securityKey = Environment.GetEnvironmentVariable("SecurityKey:ComputeLeaderboard");
-            if (!string.IsNullOrEmpty(securityKey) && req.Headers["x-security-key"].ToString() != securityKey)
+            _logger.LogInformation("Searching for player leaderboard entries for activity {ActivityId}.", activityId);
+            var playerName = request.playerName;
+            LeaderboardTypes type;
+            switch (leaderboardType.ToLower())
             {
-                _logger.LogWarning("Rejected leaderboard computation due to invalid security key header.");
-                return new StatusCodeResult(401);
+                case "completions":
+                    type = LeaderboardTypes.TotalCompletions;
+                    break;
+                case "speed":
+                    type = LeaderboardTypes.FastestCompletion;
+                    break;
+                default:
+                    type = LeaderboardTypes.HighestScore;
+                    break;
             }
-
-            var activities = await _queryService.GetAllActivitiesAsync();
-            var idList = activities.SelectMany(a => a.Activities.Select(a => a.Id)).ToList();
-            idList.Add(0);
-            foreach (var id in idList)
-            {
-                await _queryService.ComputeCompletionsLeaderboardAsync(id);
-                await _queryService.ComputeSpeedLeaderboardAsync(id);
-                await _queryService.ComputeTotalTimeLeaderboardAsync(id);
-            }
-
-            return new OkResult();
+            var leaderboardEntries = await _queryService.GetLeaderboardsForPlayer(playerName, activityId, type);
+            return ResponseHelpers.CachedJson(req, leaderboardEntries, _jsonOptions, 300);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error computing leaderboards from manual request.");
+            _logger.LogError(ex, "Error searching for player leaderboard entries for activity {ActivityId}.", activityId);
             return new StatusCodeResult(500);
-        }
-    }
-
-    [Function(nameof(ComputeLeaderboardsTimer))]
-    public async Task ComputeLeaderboardsTimer([TimerTrigger("0 0 0 * * *")] TimerInfo timer)
-    {
-        try
-        {
-            _logger.LogInformation("Computing leaderboards (timer trigger).");
-            var activities = await _queryService.GetAllActivitiesAsync();
-            var idList = activities.SelectMany(a => a.Activities.Select(a => a.Id)).ToList();
-            idList.Add(0);
-            foreach (var id in idList)
-            {
-                await _queryService.ComputeCompletionsLeaderboardAsync(id);
-                await _queryService.ComputeSpeedLeaderboardAsync(id);
-                await _queryService.ComputeTotalTimeLeaderboardAsync(id);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error computing leaderboards from timer trigger.");
         }
     }
 }

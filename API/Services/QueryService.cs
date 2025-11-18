@@ -4,10 +4,11 @@ using API.Services.Abstract;
 using Domain.Data;
 using Domain.DB;
 using Domain.DTO.Responses;
-using Facet.Extensions.EFCore;
+using Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
+using System.Globalization;
 using System.Text.Json;
 
 namespace API.Services
@@ -91,7 +92,8 @@ namespace API.Services
             try
             {
                 var activities = await _context.OpTypes
-                    .Include(o => o.Activities)
+                    .Include(o => o.Activities.Where(a => a.Enabled))
+                    .Where(o => o.Activities.Any(a => a.Enabled))
                     .Select(OpTypeDto.Projection)
                     .ToListAsync();
                 await _cache.StringSetAsync("activities:all", JsonSerializer.SerializeToUtf8Bytes(activities), new TimeSpan(1, 1, 0, 0));
@@ -163,217 +165,50 @@ namespace API.Services
             }
         }
 
-        public async Task<List<CompletionsLeaderboardResponse>> GetCompletionsLeaderboardAsync(long activityId)
+        public async Task<List<LeaderboardResponse>> GetLeaderboardAsync(long activityId, LeaderboardTypes type, int count, int offset)
         {
             try
             {
-                var cachedData = await _cache.StringGetAsync($"leaderboard:completions:{activityId}");
-                if (cachedData.HasValue)
+                if (count == 250 && offset == 0)
                 {
-                    return JsonSerializer.Deserialize<List<CompletionsLeaderboardResponse>>(cachedData)
-                        ?? new List<CompletionsLeaderboardResponse>();
-                }
-                else
-                {
-                    await ComputeCompletionsLeaderboardAsync(activityId);
-                    cachedData = await _cache.StringGetAsync($"leaderboard:completions:{activityId}");
+                    var cachedData = await _cache.StringGetAsync($"leaderboard:{type}:{activityId}");
                     if (cachedData.HasValue)
                     {
-                        return JsonSerializer.Deserialize<List<CompletionsLeaderboardResponse>>(cachedData)
-                            ?? new List<CompletionsLeaderboardResponse>();
-                    }
-                    else
-                    {
-                        return new List<CompletionsLeaderboardResponse>();
+                        var leaderboardData = JsonSerializer.Deserialize<List<PlayerLeaderboard>>(cachedData!);
+                        if (leaderboardData != null)
+                        {
+                            return leaderboardData
+                                .Select(pl => new LeaderboardResponse
+                                {
+                                    Player = new PlayerDto(pl.Player),
+                                    Rank = pl.Rank,
+                                })
+                                .ToList();
+                        }
                     }
                 }
+
+                var leaderboard = await _context.PlayerLeaderboards
+                    .AsNoTracking()
+                    .Include(pl => pl.Player)
+                    .Where(pl => pl.ActivityId == activityId && pl.LeaderboardType == type)
+                    .OrderBy(pl => pl.Rank)
+                    .Skip(offset)
+                    .Take(count)
+                    .ToListAsync();
+
+                return leaderboard
+                    .Select(pl => new LeaderboardResponse()
+                    {
+                        Player = new PlayerDto(pl.Player),
+                        Rank = pl.Rank,
+                        Data = pl.Data?.Completions?.ToString("0,0", CultureInfo.InvariantCulture) ?? pl.Data?.Score?.ToString("0,0", CultureInfo.InvariantCulture) ?? pl.Data?.Duration.ToString() ?? string.Empty
+                    })
+                    .ToList();
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error retrieving completions leaderboard for activity {ActivityId}", activityId);
-                throw;
-            }
-        }
-
-        public async Task<List<TimeLeaderboardResponse>> GetSpeedLeaderboardAsync(long activityId)
-        {
-            try
-            {
-                var cachedData = await _cache.StringGetAsync($"leaderboard:speed:{activityId}");
-                if (cachedData.HasValue)
-                {
-                    return JsonSerializer.Deserialize<List<TimeLeaderboardResponse>>(cachedData)
-                        ?? new List<TimeLeaderboardResponse>();
-                }
-                else
-                {
-                    await ComputeSpeedLeaderboardAsync(activityId);
-                    cachedData = await _cache.StringGetAsync($"leaderboard:speed:{activityId}");
-                    if (cachedData.HasValue)
-                    {
-                        return JsonSerializer.Deserialize<List<TimeLeaderboardResponse>>(cachedData)
-                            ?? new List<TimeLeaderboardResponse>();
-                    }
-                    else
-                    {
-                        return new List<TimeLeaderboardResponse>();
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving speed leaderboard for activity {ActivityId}", activityId);
-                throw;
-            }
-        }
-
-        public async Task<List<TimeLeaderboardResponse>> GetTotalTimeLeaderboardAsync(long activityId)
-        {
-            try
-            {
-                var cachedData = await _cache.StringGetAsync($"leaderboard:totalTime:{activityId}");
-                if (cachedData.HasValue)
-                {
-                    return JsonSerializer.Deserialize<List<TimeLeaderboardResponse>>(cachedData)
-                        ?? new List<TimeLeaderboardResponse>();
-                }
-                else
-                {
-                    await ComputeTotalTimeLeaderboardAsync(activityId);
-                    cachedData = await _cache.StringGetAsync($"leaderboard:totalTime:{activityId}");
-                    if (cachedData.HasValue)
-                    {
-                        return JsonSerializer.Deserialize<List<TimeLeaderboardResponse>>(cachedData)
-                            ?? new List<TimeLeaderboardResponse>();
-                    }
-                    else
-                    {
-                        return new List<TimeLeaderboardResponse>();
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving total time leaderboard for activity {ActivityId}", activityId);
-                throw;
-            }
-        }
-
-        public async Task ComputeCompletionsLeaderboardAsync(long activityId)
-        {
-            try
-            {
-                var query = _context.ActivityReportPlayers
-                    .AsNoTracking()
-                    .Include(ar => ar.Player)
-                    .Include(ar => ar.ActivityReport)
-                    .Where(ar => ar.Completed);
-
-                if (activityId > 0)
-                    query = query.Where(ar => ar.ActivityReport.ActivityId == activityId);
-
-                var leaderboard = await query
-                    .GroupBy(ar => ar.PlayerId)
-                    .Select(g => new
-                    {
-                        PlayerId = g.Key,
-                        Completions = g.Count()
-                    })
-                    .OrderByDescending(x => x.Completions)
-                    .ThenBy(x => x.PlayerId)
-                    .Join(
-                        _context.Players.AsNoTracking(),
-                        g => g.PlayerId,
-                        p => p.Id,
-                        (g, p) => new CompletionsLeaderboardResponse
-                        {
-                            Player = new PlayerDto(p),
-                            Completions = g.Completions
-                        })
-                    .ToListAsync();
-
-                await _cache.StringSetAsync($"leaderboard:completions:{activityId}", JsonSerializer.SerializeToUtf8Bytes(leaderboard), new TimeSpan(1, 1, 0, 0));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving completions leaderboard for activity {ActivityId}", activityId);
-                throw;
-            }
-        }
-
-        public async Task ComputeSpeedLeaderboardAsync(long activityId)
-        {
-            try
-            {
-                var query = _context.ActivityReportPlayers
-                    .AsNoTracking()
-                    .Include(ar => ar.ActivityReport)
-                    .Where(ar => ar.Completed);
-                if (activityId > 0)
-                    query = query.Where(ar => ar.ActivityReport.ActivityId == activityId);
-                var leaderboard = await query
-                    .GroupBy(ar => ar.PlayerId)
-                    .Select(g => new
-                    {
-                        PlayerId = g.Key,
-                        BestTime = g.Min(ar => ar.Duration),
-                        CompletedDate = g.OrderBy(ar => ar.Duration).Select(ar => ar.ActivityReport.Date).First()
-                    })
-                    .OrderBy(x => x.BestTime)
-                    .ThenBy(x => x.CompletedDate)
-                    .Join(
-                        _context.Players.AsNoTracking(),
-                        g => g.PlayerId,
-                        p => p.Id,
-                        (g, p) => new TimeLeaderboardResponse
-                        {
-                            Player = new PlayerDto(p),
-                            Time = g.BestTime
-                        })
-                    .ToListAsync();
-                await _cache.StringSetAsync($"leaderboard:speed:{activityId}", JsonSerializer.SerializeToUtf8Bytes(leaderboard), new TimeSpan(1, 1, 0, 0));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving speed leaderboard for activity {ActivityId}", activityId);
-                throw;
-            }
-        }
-
-        public async Task ComputeTotalTimeLeaderboardAsync(long activityId)
-        {
-            try
-            {
-                var query = _context.ActivityReportPlayers
-                    .AsNoTracking()
-                    .Include(ar => ar.ActivityReport)
-                    .Where(ar => ar.Duration > TimeSpan.FromSeconds(0));
-                if (activityId > 0)
-                    query = query.Where(ar => ar.ActivityReport.ActivityId == activityId);
-                var leaderboard = await query
-                    .GroupBy(ar => ar.PlayerId)
-                    .Select(g => new
-                    {
-                        PlayerId = g.Key,
-                        TotalTime = g.Sum(ar => ar.Duration.TotalSeconds)
-                    })
-                    .OrderByDescending(x => x.TotalTime)
-                    .ThenBy(x => x.PlayerId)
-                    .Join(
-                        _context.Players.AsNoTracking(),
-                        g => g.PlayerId,
-                        p => p.Id,
-                        (g, p) => new TimeLeaderboardResponse
-                        {
-                            Player = new PlayerDto(p),
-                            Time = TimeSpan.FromSeconds(g.TotalTime)
-                        })
-                    .ToListAsync();
-                await _cache.StringSetAsync($"leaderboard:totalTime:{activityId}", JsonSerializer.SerializeToUtf8Bytes(leaderboard), new TimeSpan(1, 1, 0, 0));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving total time leaderboard for activity {ActivityId}", activityId);
                 throw;
             }
         }
@@ -406,14 +241,49 @@ namespace API.Services
             return lastActivity ?? new DateTime(2025, 7, 15);
         }
 
-        public async Task LoadPlayersQueue()
+        public async Task<List<PlayerSearchDto>> SearchForPlayer(string query)
         {
-            var playerIds = await _context.Players
-                .AsNoTracking()
-                .Select(p => p.Id)
-                .ToArrayAsync();
+            try
+            {
+                var results = await _context.Players
+                    .Where(p => EF.Functions.ILike(p.DisplayName, $"%{query}%"))
+                    .Select(PlayerSearchDto.Projection)
+                    .Take(25)
+                    .ToListAsync();
+                return results;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error searching for player with query {Query}", query);
+                throw;
+            }
+        }
 
-            await _cache.ListRightPushAsync("player-crawl-queue", playerIds.Select(id => (RedisValue)id).ToArray());
+        public async Task<List<LeaderboardResponse>> GetLeaderboardsForPlayer(string playerName, long activityId, LeaderboardTypes type)
+        {
+            try
+            {
+                var leaderboards = await _context.PlayerLeaderboards
+                    .AsNoTracking()
+                    .Include(pl => pl.Player)
+                    .Where(pl => EF.Functions.ILike(pl.FullDisplayName, $"%{playerName}%") && pl.LeaderboardType == type && pl.ActivityId == activityId)
+                    .OrderBy(pl => pl.Rank)
+                    .Take(250)
+                    .ToListAsync();
+                return leaderboards
+                    .Select(pl => new LeaderboardResponse()
+                    {
+                        Player = new PlayerDto(pl.Player),
+                        Rank = pl.Rank,
+                        Data = pl.Data?.Completions?.ToString("0,0", CultureInfo.InvariantCulture) ?? pl.Data?.Score?.ToString("0,0", CultureInfo.InvariantCulture) ?? pl.Data?.Duration.ToString() ?? string.Empty
+                    })
+                    .ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving leaderboards for player {PlayerName}", playerName);
+                throw;
+            }
         }
     }
 }

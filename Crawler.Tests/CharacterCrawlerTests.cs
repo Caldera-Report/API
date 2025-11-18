@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using StackExchange.Redis;
+using System.Collections.Concurrent;
 using System.Threading.Channels;
 
 namespace Crawler.Tests;
@@ -67,7 +68,9 @@ public class CharacterCrawlerTests
             });
 
         var inputChannel = Channel.CreateUnbounded<CharacterWorkItem>();
-        var outputChannel = Channel.CreateUnbounded<long>();
+        var outputChannel = Channel.CreateUnbounded<ActivityReportWorkItem>();
+        var playerActivityCount = new ConcurrentDictionary<long, int>();
+        var playerCharacterWorkCount = new ConcurrentDictionary<long, int>();
 
         var crawler = new CharacterCrawler(
             multiplexerMock.Object,
@@ -75,7 +78,9 @@ public class CharacterCrawlerTests
             inputChannel.Reader,
             outputChannel.Writer,
             NullLogger<CharacterCrawler>.Instance,
-            new Mock<IDbContextFactory<AppDbContext>>().Object);
+            new Mock<IDbContextFactory<AppDbContext>>().Object,
+            playerActivityCount,
+            playerCharacterWorkCount);
 
         var player = new Player
         {
@@ -118,7 +123,9 @@ public class CharacterCrawlerTests
             }));
 
         var inputChannel = Channel.CreateUnbounded<CharacterWorkItem>();
-        var outputChannel = Channel.CreateUnbounded<long>();
+        var outputChannel = Channel.CreateUnbounded<ActivityReportWorkItem>();
+        var playerActivityCount = new ConcurrentDictionary<long, int>();
+        var playerCharacterWorkCount = new ConcurrentDictionary<long, int>();
 
         var crawler = new CharacterCrawler(
             multiplexerMock.Object,
@@ -126,7 +133,9 @@ public class CharacterCrawlerTests
             inputChannel.Reader,
             outputChannel.Writer,
             NullLogger<CharacterCrawler>.Instance,
-            new Mock<IDbContextFactory<AppDbContext>>().Object);
+            new Mock<IDbContextFactory<AppDbContext>>().Object,
+            playerActivityCount,
+            playerCharacterWorkCount);
 
         var player = new Player
         {

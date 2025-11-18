@@ -264,3 +264,4 @@ __pycache__/
 *.pyc
 /API/appsettings.json
 /API.Domain/appsettings.json
+.playwright-mcp

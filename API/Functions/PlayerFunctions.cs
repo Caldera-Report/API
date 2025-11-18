@@ -1,15 +1,14 @@
 using API.Helpers;
+using API.Models.Responses;
 using API.Services.Abstract;
-using Azure.Identity;
-using Azure.ResourceManager;
-using Azure.ResourceManager.AppContainers;
 using Domain.DTO.Requests;
+using Facet.Extensions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
-using System.Linq;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using FromBodyAttribute = Microsoft.Azure.Functions.Worker.Http.FromBodyAttribute;
 
 namespace API.Functions;
@@ -42,7 +41,22 @@ public class PlayerFunctions
         }
         try
         {
-            var searchResults = await _destiny2Service.SearchForPlayer(playerName);
+            if (Regex.IsMatch(playerName, @"^\d{19}$"))
+            {
+                return new ContentResult
+                {
+                    Content = JsonSerializer.Serialize(new List<PlayerSearchDto>() 
+                    { 
+                        (await _queryService.GetPlayerDbObject(long.Parse(playerName))).ToFacet<PlayerSearchDto>() 
+                    }, _jsonOptions),
+                    StatusCode = StatusCodes.Status200OK,
+                    ContentType = "application/json"
+                };
+            }
+                
+            var searchResults = await _queryService.SearchForPlayer(playerName);
+            if (searchResults.Count == 0)
+                searchResults = await _destiny2Service.SearchForPlayer(playerName);
             JsonSerializer.Serialize(searchResults, _jsonOptions);
             return new ContentResult
             {
@@ -81,23 +95,6 @@ public class PlayerFunctions
         }
     }
 
-    [Function(nameof(GetAllPlayers))]
-    public async Task<IActionResult> GetAllPlayers([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "players")] HttpRequest req)
-    {
-        _logger.LogInformation("Processing request for all players.");
-
-        try
-        {
-            var players = await _queryService.GetAllPlayersAsync();
-            return ResponseHelpers.CachedJson(req, players, _jsonOptions, 0);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving all players.");
-            return new StatusCodeResult(500);
-        }
-    }
-
     [Function(nameof(GetPlayerStatsForActivity))]
     public async Task<IActionResult> GetPlayerStatsForActivity([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "players/{membershipId}/stats/{activityId}")] HttpRequest req, long membershipId, long activityId)
     {
@@ -129,12 +126,6 @@ public class PlayerFunctions
         {
             var player = await _queryService.GetPlayerDbObject(membershipId);
 
-            if (DateTime.UtcNow - player.LastUpdateCompleted < TimeSpan.FromMinutes(5))
-            {
-                _logger.LogInformation("Skipping activity load for {MembershipId} due to recent update.", membershipId);
-                return new NoContentResult();
-            }
-
             var characters = await _destiny2Service.GetCharactersForPlayer(membershipId, player.MembershipType);
             var lastPlayed = await _queryService.GetPlayerLastPlayedActivityDate(membershipId);
             foreach (var character in characters)
@@ -161,38 +152,7 @@ public class PlayerFunctions
     {
         try
         {
-            await _queryService.LoadPlayersQueue();
             await _destiny2Service.GroupActivityDuplicates();
-
-            //Azure job containers aren't going to work out at least for the first load, so commenting this out for now.
-
-            //var credential = new DefaultAzureCredential();
-
-            //var armClient = new ArmClient(credential);
-
-            //var subscription = Environment.GetEnvironmentVariable("AZURE_SUBSCRIPTION_ID");
-            //string resourceGroupName = "Caldera-ReportResourceGroup";
-            //string jobName = "caldera-report-crawler";
-
-            //var jobResourceId = ContainerAppJobResource.CreateResourceIdentifier(subscription!, resourceGroupName, jobName);
-            //var job = armClient.GetContainerAppJobResource(jobResourceId);
-
-            //var executions = job.GetContainerAppJobExecutions().ToList();
-
-            //bool isRunning = executions.Any(e =>
-            //{
-            //    var status = e.Data.Status;
-            //    return status == "Running" || status == "Pending";
-            //});
-
-            //if (isRunning)
-            //{
-            //    _logger.LogWarning("A crawler job is already running, skipping new start.");
-            //    return;
-            //}
-
-            //_logger.LogInformation("Starting crawler job...");
-            //await job.StartAsync(Azure.WaitUntil.Started);
 
             _logger.LogInformation("Crawler job started successfully.");
         }

@@ -1,0 +1,366 @@
+:root {
+  --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  --bg: #0f172a;
+  --bg-alt: #1e293b;
+  --text: #e2e8f0;
+  --text-dim: #94a3b8;
+  --border: 1px solid #1e293b;
+  --radius: 14px;
+  --accent: #6366f1;
+  --accent-glow: 0 0 0 0.25rem rgba(99, 102, 241, 0.35);
+  --surface: linear-gradient(145deg, #1e293b 0%, #0f172a 100%);
+  --shadow-sm: 0 2px 4px -2px rgba(0, 0, 0, 0.35),
+    0 4px 12px -2px rgba(0, 0, 0, 0.25);
+  --bs-body-color: var(--text);
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f8fafc;
+    --bg-alt: #ffffff;
+    --text: #0f172a;
+    --text-dim: #64748b;
+    --border: 1px solid #e2e8f0;
+    --surface: linear-gradient(145deg, #ffffff 0%, #f1f5f9 100%);
+    --shadow-sm: 0 2px 4px -2px rgba(0, 0, 0, 0.08),
+      0 4px 12px -2px rgba(0, 0, 0, 0.06);
+    --bs-body-color: var(--text);
+  }
+}
+
+html,
+body {
+  height: 100%;
+}
+body {
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--text) !important;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.1rem clamp(1.2rem, 2.5vw, 2.4rem) 0.85rem;
+  backdrop-filter: blur(12px);
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: linear-gradient(90deg, #18243a, #0f172a);
+  border-bottom: 1px solid #24324b;
+  box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.5);
+}
+@media (prefers-color-scheme: light) {
+  html:not(.force-dark):not(.force-light) .app-header {
+    background: linear-gradient(90deg, #ffffff, #f1f5f9);
+    border-bottom: 1px solid #e2e8f0;
+    box-shadow: 0 4px 12px -4px rgba(0, 0, 0, 0.08);
+  }
+}
+.app-title {
+  font-size: clamp(1.25rem, 2.6vw, 1.85rem);
+  margin: 0;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: var(--text);
+}
+.app-subtitle {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+}
+.single-main {
+  padding: 1.5rem clamp(1.2rem, 2.5vw, 2.4rem) 2.5rem;
+}
+.app-surface {
+  max-width: 1400px;
+  margin-inline: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+.theme-toggle {
+  font-size: 0.75rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 0.65rem;
+}
+.status-chip {
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 0.3rem 0.55rem;
+  border-radius: 0.5rem;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  background: #64748b;
+  color: #fff;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15);
+}
+.status-running {
+  background: #16a34a;
+}
+.status-idle {
+  background: #6366f1;
+}
+.status-error {
+  background: #dc2626;
+}
+.status-unknown {
+  background: #64748b;
+}
+
+/* Dashboard cards */
+.card {
+  background: var(--surface);
+  border: var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  color: var(--text) !important;
+}
+.card-header {
+  font-weight: 600;
+  padding: 0.85rem 1rem 0.65rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  opacity: 0.8;
+  color: var(--text-dim) !important;
+}
+.card-body {
+  padding: 0.75rem 1rem 1rem;
+}
+
+/* Progress bar refinement */
+.progress {
+  background: rgba(255, 255, 255, 0.08);
+  height: 0.9rem;
+  border-radius: 999px;
+  overflow: hidden;
+}
+.progress-bar {
+  background: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+.progress-anim {
+  animation: progressPulse 1.6s ease-in-out infinite;
+  background: linear-gradient(
+    90deg,
+    rgba(var(--accent-rgb), 0.6),
+    var(--accent) 50%,
+    rgba(var(--accent-rgb), 0.6)
+  );
+  background-size: 200% 100%;
+}
+
+/* Typography tweaks */
+h1,
+h2,
+h3,
+h4 {
+  font-weight: 600;
+}
+dl {
+  margin: 0;
+}
+dt {
+  font-weight: 500;
+  opacity: 0.75;
+}
+dd {
+  font-weight: 600;
+}
+
+/* Status tone */
+.text-muted {
+  color: var(--text-dim) !important;
+}
+
+/* Error UI */
+#blazor-error-ui {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #dc2626;
+  color: #fff;
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 -2px 8px -2px rgba(0, 0, 0, 0.35);
+}
+#blazor-error-ui .reload {
+  color: #fff;
+  font-weight: 600;
+}
+#blazor-error-ui .dismiss {
+  cursor: pointer;
+}
+
+/* Forms (future) */
+input:focus,
+button:focus,
+.btn:focus {
+  outline: none;
+  box-shadow: var(--accent-glow);
+}
+
+/* Utility */
+.shadow-sm {
+  box-shadow: var(--shadow-sm);
+}
+.fw-semibold {
+  font-weight: 600 !important;
+}
+.fs-3 {
+  font-size: clamp(1.35rem, 2.6vw, 1.9rem) !important;
+}
+.fs-4 {
+  font-size: clamp(1.1rem, 2.1vw, 1.5rem) !important;
+}
+
+/* Animations */
+.card,
+.progress-bar {
+  transition: background 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+}
+.card:hover {
+  transform: translateY(-2px);
+}
+
+/* Scrollbar (webkit) */
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 20px;
+  border: 2px solid #0f172a;
+}
+@media (prefers-color-scheme: light) {
+  ::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border: 2px solid #f8fafc;
+  }
+}
+
+/* Accent button */
+.btn-primary {
+  background: var(--accent);
+  border: none;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+.btn-primary:hover {
+  filter: brightness(1.08);
+}
+
+/* Fade in */
+body {
+  animation: fadeIn 0.4s ease;
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes progressPulse {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* Manual theme overrides */
+html.force-light {
+  --bg: #f8fafc;
+  --bg-alt: #ffffff;
+  --text: #0f172a;
+  --text-dim: #64748b;
+  --border: 1px solid #e2e8f0;
+  --surface: linear-gradient(145deg, #ffffff 0%, #f1f5f9 100%);
+  --shadow-sm: 0 2px 4px -2px rgba(0, 0, 0, 0.08),
+    0 4px 12px -2px rgba(0, 0, 0, 0.06);
+  --bs-body-color: var(--text);
+}
+html.force-dark {
+  --bg: #0f172a;
+  --bg-alt: #1e293b;
+  --text: #e2e8f0;
+  --text-dim: #94a3b8;
+  --border: 1px solid #1e293b;
+  --surface: linear-gradient(145deg, #1e293b 0%, #0f172a 100%);
+  --shadow-sm: 0 2px 4px -2px rgba(0, 0, 0, 0.35),
+    0 4px 12px -2px rgba(0, 0, 0, 0.25);
+  --bs-body-color: var(--text);
+}
+/* Force dark mode text overrides for Bootstrap utility classes applied earlier */
+html.force-dark .bg-primary {
+  background-color: var(--accent) !important;
+}
+html.force-dark .text-white {
+  color: var(--text) !important;
+}
+html.force-dark .card.border-primary {
+  border-color: var(--accent) !important;
+}
+html.force-dark .card-header.bg-primary {
+  background: var(--accent) !important;
+  color: #fff !important;
+}
+html.force-dark .card,
+html.force-dark .card-body,
+html.force-dark .card *:not(.status-chip):not(.progress-bar) {
+  color: var(--text) !important;
+}
+html.force-dark .card-header {
+  color: var(--text-dim) !important;
+}
+html.force-dark dt {
+  color: var(--text-dim) !important;
+}
+html.force-dark dd,
+html.force-dark .fw-semibold {
+  color: var(--text) !important;
+}
+html.force-dark .app-header {
+  background: linear-gradient(90deg, #1e293b, #0f172a);
+  border-bottom: 1px solid #334155;
+  box-shadow: 0 4px 16px -4px rgba(0, 0, 0, 0.6);
+}
+html.force-light .app-header {
+  background: linear-gradient(90deg, #ffffff, #f1f5f9);
+  border-bottom: 1px solid #e2e8f0;
+  box-shadow: 0 4px 12px -4px rgba(0, 0, 0, 0.08);
+}

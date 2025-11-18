@@ -7,6 +7,7 @@
         public string ImageURL { get; set; }
         public int Index { get; set; }
         public int OpTypeId { get; set; }
+        public bool Enabled { get; set; }
 
         public ICollection<ActivityReport> ActivityReports { get; set; }
         public OpType OpType { get; set; }

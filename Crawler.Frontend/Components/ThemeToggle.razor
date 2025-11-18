@@ -1,0 +1,34 @@
+@inject IJSRuntime JS
+@rendermode InteractiveServer
+
+<button class="btn btn-sm btn-primary theme-toggle" @onclick="CycleTheme">@_themeLabel</button>
+
+@code {
+    private string _mode = "auto"; // auto | light | dark
+    private string _themeLabel => _mode switch { "auto" => "Auto", "dark" => "Dark", "light" => "Light" , _ => "Auto"};
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                var saved = await JS.InvokeAsync<string?>("localStorage.getItem", "theme-mode");
+                if (!string.IsNullOrWhiteSpace(saved))
+                {
+                    _mode = saved!;
+                    await JS.InvokeVoidAsync("theme.set", _mode);
+                    StateHasChanged();
+                }
+            }
+            catch { }
+        }
+    }
+
+    private async Task CycleTheme()
+    {
+        _mode = _mode switch { "auto" => "dark", "dark" => "light", "light" => "auto", _ => "auto" };
+        await JS.InvokeVoidAsync("theme.set", _mode);
+        StateHasChanged();
+    }
+}
