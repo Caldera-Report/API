@@ -30,6 +30,11 @@ public class PgcrProcessorTests
             .Setup(m => m.GetDatabase(Moq.It.IsAny<int>(), Moq.It.IsAny<object>()))
             .Returns(databaseMock.Object);
 
+        var activityHashMap = new Dictionary<long, long>
+        {
+            { 1000, 2000 }
+        };
+
         var dbName = Guid.NewGuid().ToString();
         const long processedPlayerId = 9999;
         const long newPlayerId = 12345;
@@ -76,7 +81,8 @@ public class PgcrProcessorTests
             multiplexerMock.Object,
             new TestDbContextFactory(options),
             NullLogger<PgcrProcessor>.Instance,
-            playerActivityCount);
+            playerActivityCount,
+            activityHashMap);
 
         var pgcr = new PostGameCarnageReportData
         {
@@ -155,6 +161,11 @@ public class PgcrProcessorTests
             .Setup(m => m.GetDatabase(Moq.It.IsAny<int>(), Moq.It.IsAny<object>()))
             .Returns(databaseMock.Object);
 
+        var activityHashMap = new Dictionary<long, long>
+        {
+            { 1000, 2000 }
+        };
+
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
@@ -202,7 +213,8 @@ public class PgcrProcessorTests
             multiplexerMock.Object,
             new TestDbContextFactory(options),
             NullLogger<PgcrProcessor>.Instance,
-            playerActivityCount);
+            playerActivityCount,
+            activityHashMap);
 
         var pgcr = new PostGameCarnageReportData
         {

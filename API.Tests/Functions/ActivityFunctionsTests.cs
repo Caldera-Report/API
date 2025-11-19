@@ -15,13 +15,14 @@ namespace API.Tests.Functions;
 public class ActivityFunctionsTests
 {
     private readonly Mock<IQueryService> _queryService = new();
+    private readonly Mock<IDestiny2Service> _destiny2Service = new();
     private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
     private readonly ActivityFunctions _functions;
 
     public ActivityFunctionsTests()
     {
         var logger = Mock.Of<ILogger<ActivityFunctions>>();
-        _functions = new ActivityFunctions(_queryService.Object, logger, _jsonOptions);
+        _functions = new ActivityFunctions(_queryService.Object, _destiny2Service.Object, logger, _jsonOptions);
     }
 
     [Fact]

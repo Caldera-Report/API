@@ -171,7 +171,7 @@ namespace API.Services
             {
                 if (count == 250 && offset == 0)
                 {
-                    var cachedData = await _cache.StringGetAsync($"leaderboard:{type}:{activityId}");
+                    var cachedData = await _cache.StringGetAsync($"leaderboard:activity:{activityId}:type:{type}");
                     if (cachedData.HasValue)
                     {
                         var leaderboardData = JsonSerializer.Deserialize<List<PlayerLeaderboard>>(cachedData!);

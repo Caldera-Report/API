@@ -31,6 +31,11 @@ public class CharacterCrawlerTests
             .Setup(m => m.GetDatabase(Moq.It.IsAny<int>(), Moq.It.IsAny<object>()))
             .Returns(databaseMock.Object);
 
+        var activityHashMap = new Dictionary<long, long>
+        {
+            { 100, 200 }
+        };
+
         var clientMock = new Mock<IDestiny2ApiClient>();
         clientMock.Setup(client => client.GetHistoricalStatsForCharacter(1, 2, "character-1", 0, 250, Moq.It.IsAny<CancellationToken>()))
             .ReturnsAsync(new DestinyApiResponse<DestinyActivityHistoryResults>
@@ -80,7 +85,8 @@ public class CharacterCrawlerTests
             NullLogger<CharacterCrawler>.Instance,
             new Mock<IDbContextFactory<AppDbContext>>().Object,
             playerActivityCount,
-            playerCharacterWorkCount);
+            playerCharacterWorkCount,
+            activityHashMap);
 
         var player = new Player
         {
@@ -112,6 +118,8 @@ public class CharacterCrawlerTests
             .Setup(m => m.GetDatabase(Moq.It.IsAny<int>(), Moq.It.IsAny<object>()))
             .Returns(databaseMock.Object);
 
+        var activityHashMap = new Dictionary<long, long>();
+
         var clientMock = new Mock<IDestiny2ApiClient>();
         clientMock.Setup(client => client.GetHistoricalStatsForCharacter(Moq.It.IsAny<long>(), Moq.It.IsAny<int>(), Moq.It.IsAny<string>(), Moq.It.IsAny<int>(), Moq.It.IsAny<int>(), Moq.It.IsAny<CancellationToken>()))
             .ThrowsAsync(new DestinyApiException(new DestinyApiResponseError
@@ -135,7 +143,8 @@ public class CharacterCrawlerTests
             NullLogger<CharacterCrawler>.Instance,
             new Mock<IDbContextFactory<AppDbContext>>().Object,
             playerActivityCount,
-            playerCharacterWorkCount);
+            playerCharacterWorkCount,
+            activityHashMap);
 
         var player = new Player
         {
