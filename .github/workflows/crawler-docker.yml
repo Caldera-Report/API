@@ -6,6 +6,7 @@ on:
       - master
     paths:
       - 'Crawler/**'
+      - 'Crawler.Frontend/**'
       - 'Domain/**'
       - '.github/workflows/crawler-docker.yml'
 
@@ -25,7 +26,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push image
+      - name: Build and push crawler image
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -34,3 +35,13 @@ jobs:
           tags: |
             chopstickleg/caldera-report-crawler:latest
             chopstickleg/caldera-report-crawler:${{ github.sha }}
+
+      - name: Build and push crawler frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Crawler.Frontend/Dockerfile
+          push: true
+          tags: |
+            chopstickleg/caldera-report-crawler-frontend:latest
+            chopstickleg/caldera-report-crawler-frontend:${{ github.sha }}

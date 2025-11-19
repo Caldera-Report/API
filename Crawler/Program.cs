@@ -7,9 +7,8 @@ using Crawler.Services.Abstract;
 using Crawler.Telemetry;
 using Domain.Configuration;
 using Domain.Data;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting;
 using Npgsql;
 using OpenTelemetry;
 using OpenTelemetry.Exporter;
@@ -21,7 +20,7 @@ using Quartz;
 using StackExchange.Redis;
 using System.Diagnostics;
 
-var builder = WebApplication.CreateBuilder(args);
+var builder = Host.CreateApplicationBuilder(args);
 
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
@@ -56,6 +55,7 @@ builder.Services.AddSingleton<RateLimiterRegistry>();
 builder.Services.AddHttpClient<IDestiny2ApiClient, Destiny2ApiClient>();
 builder.Services.AddSingleton<PipelineOrchestrator>();
 builder.Services.AddSingleton<ILeaderboardService, LeaderboardService>();
+builder.Services.AddHostedService<RedisCrawlerTriggerListener>();
 
 // ---- Quartz ----
 builder.Services.AddQuartz(quartz =>
@@ -70,21 +70,12 @@ builder.Services.AddQuartz(quartz =>
 });
 builder.Services.AddQuartzHostedService(options => options.WaitForJobsToComplete = true);
 
-var app = builder.Build();
+var host = builder.Build();
 
-app.MapGet("/health", () => Results.Ok("ok"));
-
-app.MapPost("/api/pipeline/run", async (ISchedulerFactory schedulerFactory, CancellationToken ct) =>
-{
-    var scheduler = await schedulerFactory.GetScheduler(ct);
-    await scheduler.TriggerJob(new JobKey("PipelineOrchestratorJob"), ct);
-    return Results.Accepted();
-});
-
-await app.RunAsync();
+await host.RunAsync();
 
 // ---- Helpers ----
-void ConfigureOpenTelemetry(WebApplicationBuilder b)
+void ConfigureOpenTelemetry(HostApplicationBuilder b)
 {
     var samplingRatio = Math.Clamp(b.Configuration.GetValue<double?>("OpenTelemetry:TraceSamplingRatio") ?? 1.0, 0.0001, 1.0);
 
@@ -126,7 +117,7 @@ void ConfigureOpenTelemetry(WebApplicationBuilder b)
         }
     };
 
-    builder.Services.AddOpenTelemetry()
+    b.Services.AddOpenTelemetry()
         .ConfigureResource(configureResource)
         .WithMetrics(metrics =>
         {
@@ -146,7 +137,7 @@ void ConfigureOpenTelemetry(WebApplicationBuilder b)
             tracing.AddOtlpExporter(configureExporter);
         });
 
-    builder.Logging.AddOpenTelemetry(options =>
+    b.Logging.AddOpenTelemetry(options =>
     {
         options.IncludeScopes = true;
         options.ParseStateValues = true;
@@ -159,9 +150,9 @@ void ConfigureOpenTelemetry(WebApplicationBuilder b)
         options.AddOtlpExporter(configureExporter);
     });
 
-    builder.Logging.AddFilter<OpenTelemetryLoggerProvider>(filter =>
+    b.Logging.AddFilter<OpenTelemetryLoggerProvider>(filter =>
     {
-        if (builder.Environment.IsDevelopment())
+        if (b.Environment.IsDevelopment())
         {
             return filter >= LogLevel.Information;
         }
@@ -171,12 +162,12 @@ void ConfigureOpenTelemetry(WebApplicationBuilder b)
         }
     });
 
-    if (builder.Environment.IsDevelopment())
+    if (b.Environment.IsDevelopment())
     {
-        builder.Logging.AddFilter("Microsoft.Extensions.Logging.Console", LogLevel.Debug);
+        b.Logging.AddFilter("Microsoft.Extensions.Logging.Console", LogLevel.Debug);
     }
     else
     {
-        builder.Logging.AddFilter("Microsoft.Extensions.Logging.Console", LogLevel.Information);
+        b.Logging.AddFilter("Microsoft.Extensions.Logging.Console", LogLevel.Information);
     }
 }

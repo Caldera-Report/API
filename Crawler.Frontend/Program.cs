@@ -19,6 +19,7 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer
 builder.Services.AddDbContextFactory<AppDbContext>(options =>
     options.UseNpgsql(postgresConnectionString));
 builder.Services.AddSingleton<ICrawlerStatusProvider, CrawlerStatusProvider>();
+builder.Services.AddSingleton<ICrawlerTriggerService, CrawlerTriggerService>();
 
 var app = builder.Build();
 

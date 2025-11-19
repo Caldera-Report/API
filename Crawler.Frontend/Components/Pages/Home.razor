@@ -3,6 +3,7 @@
 @using Crawler.Frontend.Services
 @implements IAsyncDisposable
 @inject ICrawlerStatusProvider StatusProvider
+@inject ICrawlerTriggerService TriggerService
 
 <PageTitle>Crawler Dashboard</PageTitle>
 
@@ -15,6 +16,13 @@
         <div class="text-end">
             <div class="fw-semibold">Last refreshed</div>
             <div>@FormatTimestamp(_lastUpdatedUtc)</div>
+            <button class="btn btn-sm btn-primary mt-2" disabled="@_triggering" @onclick="TriggerPipelineAsync">
+                @GetButtonText()
+            </button>
+            @if (!string.IsNullOrEmpty(_triggerMessage))
+            {
+                <div class="small text-muted mt-1">@_triggerMessage</div>
+            }
         </div>
     </div>
 
@@ -105,12 +113,15 @@
 </div>
 
 @code {
+
     private readonly TimeSpan _refreshInterval = TimeSpan.FromSeconds(5);
     private PeriodicTimer? _refreshTimer;
     private CancellationTokenSource? _refreshCts;
     private CrawlerStatusSnapshot _status = CrawlerStatusSnapshot.Empty;
     private DateTime? _lastUpdatedUtc;
     private string? _errorMessage;
+    private bool _triggering;
+    private string? _triggerMessage;
 
     protected override async Task OnInitializedAsync()
     {
@@ -180,6 +191,8 @@
         _ => "status-unknown"
     };
 
+    private string GetButtonText() => _triggering ? "Triggering…" : "Run pipeline now";
+
     public async ValueTask DisposeAsync()
     {
         if (_refreshCts is not null)
@@ -191,6 +204,30 @@
         if (_refreshTimer is not null)
         {
             _refreshTimer.Dispose();
+        }
+    }
+
+    private async Task TriggerPipelineAsync()
+    {
+        if (_triggering) 
+        {
+            _triggerMessage = null;
+            return;
+        }
+        _triggering = true;
+        _triggerMessage = null;
+        try
+        {
+            await TriggerService.TriggerAsync();
+            _triggerMessage = "Trigger sent via Redis.";
+        }
+        catch (Exception ex)
+        {
+            _triggerMessage = $"Failed to trigger: {ex.Message}";
+        }
+        finally
+        {
+            _triggering = false;
         }
     }
 }

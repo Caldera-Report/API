@@ -22,6 +22,8 @@ env:
 jobs:
   build-and-deploy:
     runs-on: windows-latest
+    env:
+      ConnectionStrings__PostgreSqlConnectionString: ${{ secrets.DOMAIN_DB_CONNECTION_STRING }}
     permissions:
       id-token: write #This is required for requesting the JWT
       contents: read #This is required for actions/checkout
@@ -46,6 +48,16 @@ jobs:
       - name: Build and publish
         shell: pwsh
         run: dotnet publish './${{ env.FUNCTIONS_PROJECT_FILE }}' --configuration Release --output './${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
+
+      - name: Install dotnet-ef CLI
+        shell: pwsh
+        run: dotnet tool install --global dotnet-ef --version 9.0.10
+
+      - name: Apply EF Core migrations
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:PATH;$env:USERPROFILE\.dotnet\tools"
+          dotnet ef database update --project Domain/Domain.csproj --startup-project ${{ env.FUNCTIONS_PROJECT_FILE }} --context Domain.Data.AppDbContext
 
       - name: Login to Azure
         uses: azure/login@v2
