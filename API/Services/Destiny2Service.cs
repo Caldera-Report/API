@@ -249,7 +249,8 @@ namespace API.Services
                                         PlayerId = player.Id,
                                         Score = (int)activity.values["score"].basic.value,
                                         Completed = activity.values["completed"].basic.value == 1 && activity.values["completionReason"].basic.value != 2.0,
-                                        Duration = TimeSpan.FromSeconds(activity.values["activityDurationSeconds"].basic.value)
+                                        Duration = TimeSpan.FromSeconds(activity.values["activityDurationSeconds"].basic.value),
+                                        ActivityId = canonicalId
                                     }
                                 }
                             });
@@ -261,7 +262,8 @@ namespace API.Services
                                 PlayerId = player.Id,
                                 Score = (int)activity.values["score"].basic.value,
                                 Completed = activity.values["completed"].basic.value == 1 && activity.values["completionReason"].basic.value != 2.0,
-                                Duration = TimeSpan.FromSeconds(activity.values["activityDurationSeconds"].basic.value)
+                                Duration = TimeSpan.FromSeconds(activity.values["activityDurationSeconds"].basic.value),
+                                ActivityId = canonicalId
                             });
                             existing.NeedsFullCheck = existing.Players.Count != activity.values["playerCount"].basic.value;
                         }
