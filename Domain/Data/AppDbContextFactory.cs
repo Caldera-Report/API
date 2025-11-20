@@ -11,7 +11,7 @@ namespace Domain.Data
             // Build configuration
             var config = new ConfigurationBuilder()
                 .SetBasePath(Directory.GetCurrentDirectory())
-                .AddJsonFile("appsettings.json", optional: false)
+                .AddJsonFile("appsettings.json", optional: true)
                 .AddJsonFile("appsettings.Development.json", optional: true)
                 .Build();
 
@@ -19,7 +19,10 @@ namespace Domain.Data
             var connectionString = config.GetSection("ConnectionStrings")["PostgreSqlConnectionString"];
 
             var optionsBuilder = new DbContextOptionsBuilder<AppDbContext>();
-            optionsBuilder.UseNpgsql(connectionString);
+            optionsBuilder.UseNpgsql(connectionString, options =>
+            {
+                options.CommandTimeout(180);
+            });
 
             return new AppDbContext(optionsBuilder.Options);
         }
