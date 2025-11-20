@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using StackExchange.Redis;
+using System.Collections.Concurrent;
 using System.Threading.Channels;
 
 namespace Crawler.Tests;
@@ -29,6 +30,11 @@ public class CharacterCrawlerTests
         multiplexerMock
             .Setup(m => m.GetDatabase(Moq.It.IsAny<int>(), Moq.It.IsAny<object>()))
             .Returns(databaseMock.Object);
+
+        var activityHashMap = new Dictionary<long, long>
+        {
+            { 100, 200 }
+        };
 
         var clientMock = new Mock<IDestiny2ApiClient>();
         clientMock.Setup(client => client.GetHistoricalStatsForCharacter(1, 2, "character-1", 0, 250, Moq.It.IsAny<CancellationToken>()))
@@ -67,7 +73,9 @@ public class CharacterCrawlerTests
             });
 
         var inputChannel = Channel.CreateUnbounded<CharacterWorkItem>();
-        var outputChannel = Channel.CreateUnbounded<long>();
+        var outputChannel = Channel.CreateUnbounded<ActivityReportWorkItem>();
+        var playerActivityCount = new ConcurrentDictionary<long, int>();
+        var playerCharacterWorkCount = new ConcurrentDictionary<long, int>();
 
         var crawler = new CharacterCrawler(
             multiplexerMock.Object,
@@ -75,7 +83,10 @@ public class CharacterCrawlerTests
             inputChannel.Reader,
             outputChannel.Writer,
             NullLogger<CharacterCrawler>.Instance,
-            new Mock<IDbContextFactory<AppDbContext>>().Object);
+            new Mock<IDbContextFactory<AppDbContext>>().Object,
+            playerActivityCount,
+            playerCharacterWorkCount,
+            activityHashMap);
 
         var player = new Player
         {
@@ -107,6 +118,8 @@ public class CharacterCrawlerTests
             .Setup(m => m.GetDatabase(Moq.It.IsAny<int>(), Moq.It.IsAny<object>()))
             .Returns(databaseMock.Object);
 
+        var activityHashMap = new Dictionary<long, long>();
+
         var clientMock = new Mock<IDestiny2ApiClient>();
         clientMock.Setup(client => client.GetHistoricalStatsForCharacter(Moq.It.IsAny<long>(), Moq.It.IsAny<int>(), Moq.It.IsAny<string>(), Moq.It.IsAny<int>(), Moq.It.IsAny<int>(), Moq.It.IsAny<CancellationToken>()))
             .ThrowsAsync(new DestinyApiException(new DestinyApiResponseError
@@ -118,7 +131,9 @@ public class CharacterCrawlerTests
             }));
 
         var inputChannel = Channel.CreateUnbounded<CharacterWorkItem>();
-        var outputChannel = Channel.CreateUnbounded<long>();
+        var outputChannel = Channel.CreateUnbounded<ActivityReportWorkItem>();
+        var playerActivityCount = new ConcurrentDictionary<long, int>();
+        var playerCharacterWorkCount = new ConcurrentDictionary<long, int>();
 
         var crawler = new CharacterCrawler(
             multiplexerMock.Object,
@@ -126,7 +141,10 @@ public class CharacterCrawlerTests
             inputChannel.Reader,
             outputChannel.Writer,
             NullLogger<CharacterCrawler>.Instance,
-            new Mock<IDbContextFactory<AppDbContext>>().Object);
+            new Mock<IDbContextFactory<AppDbContext>>().Object,
+            playerActivityCount,
+            playerCharacterWorkCount,
+            activityHashMap);
 
         var player = new Player
         {

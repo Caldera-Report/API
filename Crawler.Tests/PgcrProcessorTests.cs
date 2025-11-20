@@ -1,11 +1,14 @@
 using Crawler.Services;
 using Domain.Data;
 using Domain.DB;
+using Domain.DTO;
 using Domain.DestinyApi;
+using Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using StackExchange.Redis;
+using System.Collections.Concurrent;
 using System.Threading.Channels;
 
 namespace Crawler.Tests;
@@ -22,26 +25,38 @@ public class PgcrProcessorTests
             {
                 new HashEntry("1000", "2000")
             });
-        databaseMock
-            .Setup(db => db.ListRightPushAsync(
-                "player-crawl-queue",
-                Moq.It.IsAny<RedisValue[]>(),
-                Moq.It.IsAny<When>(),
-                Moq.It.IsAny<CommandFlags>()))
-            .ReturnsAsync(1L);
-
         var multiplexerMock = new Mock<IConnectionMultiplexer>();
         multiplexerMock
             .Setup(m => m.GetDatabase(Moq.It.IsAny<int>(), Moq.It.IsAny<object>()))
             .Returns(databaseMock.Object);
 
+        var activityHashMap = new Dictionary<long, long>
+        {
+            { 1000, 2000 }
+        };
+
         var dbName = Guid.NewGuid().ToString();
+        const long processedPlayerId = 9999;
+        const long newPlayerId = 12345;
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseInMemoryDatabase(dbName)
             .Options;
 
         await using (var seedContext = new AppDbContext(options))
         {
+            seedContext.Players.Add(new Player
+            {
+                Id = processedPlayerId,
+                MembershipType = 1,
+                DisplayName = "Existing",
+                DisplayNameCode = 1000,
+                FullDisplayName = "Existing#1000"
+            });
+            seedContext.PlayerCrawlQueue.Add(new PlayerCrawlQueue
+            {
+                PlayerId = processedPlayerId,
+                Status = PlayerQueueStatus.Queued
+            });
             seedContext.Activities.Add(new Activity
             {
                 Id = 2000,
@@ -58,11 +73,16 @@ public class PgcrProcessorTests
             await seedContext.SaveChangesAsync();
         }
 
+        var playerActivityCount = new ConcurrentDictionary<long, int>();
+        playerActivityCount[processedPlayerId] = 1;
+
         var processor = new PgcrProcessor(
-            Channel.CreateUnbounded<PostGameCarnageReportData>().Reader,
+            Channel.CreateUnbounded<PgcrWorkItem>().Reader,
             multiplexerMock.Object,
             new TestDbContextFactory(options),
-            NullLogger<PgcrProcessor>.Instance);
+            NullLogger<PgcrProcessor>.Instance,
+            playerActivityCount,
+            activityHashMap);
 
         var pgcr = new PostGameCarnageReportData
         {
@@ -81,7 +101,7 @@ public class PgcrProcessorTests
                         destinyUserInfo = new Destinyuserinfo
                         {
                             isPublic = true,
-                            membershipId = "12345",
+                            membershipId = newPlayerId.ToString(),
                             membershipType = 2,
                             displayName = "Guardian",
                             bungieGlobalDisplayName = "Guardian",
@@ -99,7 +119,7 @@ public class PgcrProcessorTests
             }
         };
 
-        await processor.ProcessPgcrAsync(pgcr, CancellationToken.None);
+        await processor.ProcessPgcrAsync(new PgcrWorkItem(pgcr, processedPlayerId), CancellationToken.None);
 
         await using (var verificationContext = new AppDbContext(options))
         {
@@ -108,25 +128,115 @@ public class PgcrProcessorTests
             Assert.Equal(2000L, activityReport.ActivityId);
             Assert.False(activityReport.NeedsFullCheck);
 
-            var player = await verificationContext.Players.SingleAsync();
-            Assert.Equal(12345L, player.Id);
+            var player = await verificationContext.Players.SingleAsync(p => p.Id == newPlayerId);
             Assert.Equal(2, player.MembershipType);
             Assert.Equal("Guardian", player.DisplayName);
             Assert.Equal(4444, player.DisplayNameCode);
 
             var reportPlayer = await verificationContext.ActivityReportPlayers.SingleAsync();
             Assert.Equal(5555L, reportPlayer.ActivityReportId);
-            Assert.Equal(12345L, reportPlayer.PlayerId);
+            Assert.Equal(newPlayerId, reportPlayer.PlayerId);
             Assert.Equal(250, reportPlayer.Score);
             Assert.True(reportPlayer.Completed);
             Assert.Equal(TimeSpan.FromSeconds(600), reportPlayer.Duration);
+
+            var newQueueEntry = await verificationContext.PlayerCrawlQueue.SingleAsync(q => q.PlayerId == newPlayerId);
+            Assert.Equal(PlayerQueueStatus.Queued, newQueueEntry.Status);
+
+            var processedQueueEntry = await verificationContext.PlayerCrawlQueue.SingleAsync(q => q.PlayerId == processedPlayerId);
+            Assert.Equal(PlayerQueueStatus.Completed, processedQueueEntry.Status);
+        }
+    }
+
+    [Fact]
+    public async Task ProcessPgcrAsync_ReplacesReportsMarkedForFullCheck()
+    {
+        var databaseMock = new Mock<IDatabase>();
+        databaseMock
+            .Setup(db => db.HashGetAll("activityHashMappings", Moq.It.IsAny<CommandFlags>()))
+            .Returns(new[] { new HashEntry("1000", "2000") });
+
+        var multiplexerMock = new Mock<IConnectionMultiplexer>();
+        multiplexerMock
+            .Setup(m => m.GetDatabase(Moq.It.IsAny<int>(), Moq.It.IsAny<object>()))
+            .Returns(databaseMock.Object);
+
+        var activityHashMap = new Dictionary<long, long>
+        {
+            { 1000, 2000 }
+        };
+
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        const long processedPlayerId = 999;
+
+        await using (var seedContext = new AppDbContext(options))
+        {
+            seedContext.OpTypes.Add(new OpType { Id = 1, Name = "Default" });
+            seedContext.Activities.Add(new Activity
+            {
+                Id = 2000,
+                Name = "Test Activity",
+                ImageURL = "test.png",
+                Index = 1,
+                OpTypeId = 1
+            });
+            seedContext.ActivityReports.Add(new ActivityReport
+            {
+                Id = 5555,
+                ActivityId = 2000,
+                Date = new DateTime(2025, 7, 1),
+                NeedsFullCheck = true
+            });
+            seedContext.Players.Add(new Player
+            {
+                Id = processedPlayerId,
+                MembershipType = 2,
+                DisplayName = "Existing",
+                DisplayNameCode = 1234,
+                FullDisplayName = "Existing#1234"
+            });
+            seedContext.PlayerCrawlQueue.Add(new PlayerCrawlQueue
+            {
+                PlayerId = processedPlayerId,
+                Status = PlayerQueueStatus.Queued
+            });
+            await seedContext.SaveChangesAsync();
         }
 
-        databaseMock.Verify(db => db.ListRightPushAsync(
-            "player-crawl-queue",
-            Moq.It.Is<RedisValue[]>(values => values.Length == 1 && values[0] == (RedisValue)12345L),
-            Moq.It.IsAny<When>(),
-            Moq.It.IsAny<CommandFlags>()),
-            Times.Once);
+        var playerActivityCount = new ConcurrentDictionary<long, int>();
+        playerActivityCount[processedPlayerId] = 1;
+
+        var processor = new PgcrProcessor(
+            Channel.CreateUnbounded<PgcrWorkItem>().Reader,
+            multiplexerMock.Object,
+            new TestDbContextFactory(options),
+            NullLogger<PgcrProcessor>.Instance,
+            playerActivityCount,
+            activityHashMap);
+
+        var pgcr = new PostGameCarnageReportData
+        {
+            period = new DateTime(2025, 8, 1),
+            activityDetails = new Activitydetails
+            {
+                instanceId = "5555",
+                referenceId = 1000
+            },
+            entries = Array.Empty<Entry>()
+        };
+
+        await processor.ProcessPgcrAsync(new PgcrWorkItem(pgcr, processedPlayerId), CancellationToken.None);
+
+        await using var verificationContext = new AppDbContext(options);
+        var reports = await verificationContext.ActivityReports.ToListAsync();
+        Assert.Single(reports);
+        var report = reports[0];
+        Assert.Equal(pgcr.period, report.Date);
+        Assert.False(report.NeedsFullCheck);
+
+        var queueEntry = await verificationContext.PlayerCrawlQueue.SingleAsync(q => q.PlayerId == processedPlayerId);
+        Assert.Equal(PlayerQueueStatus.Completed, queueEntry.Status);
     }
 }

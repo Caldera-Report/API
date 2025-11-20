@@ -1,14 +1,9 @@
 ﻿namespace Domain.DTO
 {
-    public class CharacterWorkItem
+    public class CharacterWorkItem(long playerId, string characterId, DateTime lastPlayed)
     {
-        public long PlayerId { get; }
-        public string CharacterId { get; }
-
-        public CharacterWorkItem(long playerId, string characterId)
-        {
-            PlayerId = playerId;
-            CharacterId = characterId;
-        }
+        public long PlayerId { get; } = playerId;
+        public string CharacterId { get; } = characterId;
+        public DateTime LastPlayed { get; } = DateTime.UtcNow;
     }
 }

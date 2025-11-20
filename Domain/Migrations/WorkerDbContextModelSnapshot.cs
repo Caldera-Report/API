@@ -27,6 +27,9 @@ namespace Worker.Migrations
                     b.Property<long>("Id")
                         .HasColumnType("bigint");
 
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("ImageURL")
                         .IsRequired()
                         .HasColumnType("text");
@@ -68,6 +71,10 @@ namespace Worker.Migrations
 
                     b.HasIndex("Id");
 
+                    b.HasIndex("Id", "ActivityId");
+
+                    b.HasIndex("Id", "ActivityId", "Date");
+
                     b.ToTable("ActivityReports");
                 });
 
@@ -77,6 +84,9 @@ namespace Worker.Migrations
                         .HasColumnType("bigint");
 
                     b.Property<long>("PlayerId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("ActivityId")
                         .HasColumnType("bigint");
 
                     b.Property<bool>("Completed")
@@ -90,7 +100,19 @@ namespace Worker.Migrations
 
                     b.HasKey("ActivityReportId", "PlayerId");
 
+                    b.HasIndex("ActivityId");
+
                     b.HasIndex("PlayerId");
+
+                    b.HasIndex("ActivityReportId", "PlayerId")
+                        .HasFilter("\"Completed\" = TRUE");
+
+                    b.HasIndex("ActivityId", "Completed", "Duration")
+                        .HasFilter("\"Completed\" = TRUE");
+
+                    b.HasIndex("ActivityReportId", "PlayerId", "Duration");
+
+                    b.HasIndex("ActivityReportId", "PlayerId", "Score");
 
                     b.ToTable("ActivityReportPlayers");
                 });
@@ -124,19 +146,15 @@ namespace Worker.Migrations
                     b.Property<int>("DisplayNameCode")
                         .HasColumnType("integer");
 
+                    b.Property<string>("FullDisplayName")
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("text");
+
                     b.Property<string>("LastPlayedCharacterBackgroundPath")
                         .HasColumnType("text");
 
                     b.Property<string>("LastPlayedCharacterEmblemPath")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("LastUpdateCompleted")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("LastUpdateStarted")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("LastUpdateStatus")
                         .HasColumnType("text");
 
                     b.Property<int>("MembershipType")
@@ -148,6 +166,61 @@ namespace Worker.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Players");
+                });
+
+            modelBuilder.Entity("Domain.DB.PlayerCrawlQueue", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("EnqueuedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("PlayerId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("PlayerCrawlQueue");
+                });
+
+            modelBuilder.Entity("Domain.DB.PlayerLeaderboard", b =>
+                {
+                    b.Property<long>("PlayerId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("ActivityId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("LeaderboardType")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Data")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("FullDisplayName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("Rank")
+                        .HasColumnType("integer");
+
+                    b.HasKey("PlayerId", "ActivityId", "LeaderboardType");
+
+                    b.HasIndex("ActivityId", "LeaderboardType", "Rank");
+
+                    b.ToTable("PlayerLeaderboards");
                 });
 
             modelBuilder.Entity("Domain.DB.Activity", b =>
@@ -187,6 +260,17 @@ namespace Worker.Migrations
                         .IsRequired();
 
                     b.Navigation("ActivityReport");
+
+                    b.Navigation("Player");
+                });
+
+            modelBuilder.Entity("Domain.DB.PlayerLeaderboard", b =>
+                {
+                    b.HasOne("Domain.DB.Player", "Player")
+                        .WithMany()
+                        .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("Player");
                 });

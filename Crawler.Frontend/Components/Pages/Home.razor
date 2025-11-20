@@ -1,0 +1,233 @@
+﻿@page "/"
+@rendermode InteractiveServer
+@using Crawler.Frontend.Services
+@implements IAsyncDisposable
+@inject ICrawlerStatusProvider StatusProvider
+@inject ICrawlerTriggerService TriggerService
+
+<PageTitle>Crawler Dashboard</PageTitle>
+
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="mb-0">Crawler Dashboard</h1>
+            <p class="text-muted mb-0">Live view of the ingestion pipeline (auto-refreshes every 5 seconds).</p>
+        </div>
+        <div class="text-end">
+            <div class="fw-semibold">Last refreshed</div>
+            <div>@FormatTimestamp(_lastUpdatedUtc)</div>
+            <button class="btn btn-sm btn-primary mt-2" disabled="@_triggering" @onclick="TriggerPipelineAsync">
+                @GetButtonText()
+            </button>
+            @if (!string.IsNullOrEmpty(_triggerMessage))
+            {
+                <div class="small text-muted mt-1">@_triggerMessage</div>
+            }
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="alert alert-danger" role="alert">
+            Failed to load crawler status: @_errorMessage
+        </div>
+    }
+
+    <div class="row g-3 mb-3">
+        <div class="col-12 col-lg-4">
+            <div class="card h-100 border-primary">
+                <div class="card-header d-flex justify-content-between align-items-center bg-primary text-white">
+                    <span>Current Run</span>
+                    <span class="status-chip @GetStatusClass()">@_status.Status</span>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-6">Oldest queued</dt>
+                        <dd class="col-6 text-end">@FormatTimestamp(_status.OldestQueuedAt)</dd>
+                        <dt class="col-6">Last processed</dt>
+                        <dd class="col-6 text-end">@FormatTimestamp(_status.LastProcessedAt)</dd>
+                        <dt class="col-6">Processing now</dt>
+                        <dd class="col-6 text-end">@FormatNumber(_status.ProcessingPlayers)</dd>
+                        <dt class="col-6">Errors</dt>
+                        <dd class="col-6 text-end">@FormatNumber(_status.ErrorPlayers)</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-lg-4">
+            <div class="card h-100">
+                <div class="card-header">Players</div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-baseline">
+                        <div>
+                            <div class="text-muted">Processed</div>
+                            <div class="fs-3 fw-semibold">@FormatNumber(_status.CompletedPlayers)</div>
+                        </div>
+                        <div class="text-end">
+                            <div class="text-muted">Total queued</div>
+                            <div class="fs-3 fw-semibold">@FormatNumber(_status.TotalPlayers)</div>
+                        </div>
+                    </div>
+                    <div class="progress my-3" role="progressbar" aria-valuenow="@_status.CompletionPercent" aria-valuemin="0" aria-valuemax="100">
+                        <div class="progress-bar @( _status.CompletionPercent > 0 ? "progress-anim" : string.Empty)" style="width: @GetClampedProgress()%">
+                            @GetClampedProgressDisplay()%
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-between text-muted">
+                        <div>Remaining: @FormatNumber(_status.PlayersRemaining)</div>
+                        <div>Queue length: @FormatNumber(_status.QueuedPlayers)</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-lg-4">
+            <div class="card h-100">
+                <div class="card-header">Queue Breakdown</div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-6">Queued</dt>
+                        <dd class="col-6 text-end">@FormatNumber(_status.QueuedPlayers)</dd>
+                        <dt class="col-6">Processing</dt>
+                        <dd class="col-6 text-end">@FormatNumber(_status.ProcessingPlayers)</dd>
+                        <dt class="col-6">Completed</dt>
+                        <dd class="col-6 text-end">@FormatNumber(_status.CompletedPlayers)</dd>
+                        <dt class="col-6">Errors</dt>
+                        <dd class="col-6 text-end">@FormatNumber(_status.ErrorPlayers)</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">Previous run summary</div>
+        <div class="card-body">
+            <dl class="row mb-0">
+                <dt class="col-sm-4 col-lg-3">Last run started</dt>
+                <dd class="col-sm-8 col-lg-3">@FormatTimestamp(_status.LastRunStartedAt)</dd>
+                <dt class="col-sm-4 col-lg-3">Last run finished</dt>
+                <dd class="col-sm-8 col-lg-3">@FormatTimestamp(_status.LastRunFinishedAt)</dd>
+            </dl>
+        </div>
+    </div>
+</div>
+
+@code {
+
+    private readonly TimeSpan _refreshInterval = TimeSpan.FromSeconds(5);
+    private PeriodicTimer? _refreshTimer;
+    private CancellationTokenSource? _refreshCts;
+    private CrawlerStatusSnapshot _status = CrawlerStatusSnapshot.Empty;
+    private DateTime? _lastUpdatedUtc;
+    private string? _errorMessage;
+    private bool _triggering;
+    private string? _triggerMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStatusAsync();
+        _refreshCts = new CancellationTokenSource();
+        _refreshTimer = new PeriodicTimer(_refreshInterval);
+        _ = Task.Run(() => RefreshLoopAsync(_refreshCts.Token));
+    }
+
+    private async Task RefreshLoopAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (_refreshTimer is not null && await _refreshTimer.WaitForNextTickAsync(cancellationToken))
+            {
+                await LoadStatusAsync();
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected when the component is disposed.
+        }
+    }
+
+    private async Task LoadStatusAsync()
+    {
+        try
+        {
+            _status = await StatusProvider.GetSnapshotAsync();
+            _lastUpdatedUtc = DateTime.UtcNow;
+            _errorMessage = null;
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+    }
+
+    private static string FormatTimestamp(DateTime? value)
+        => value is null ? "—" : $"{value:yyyy-MM-dd HH:mm:ss} UTC";
+
+    private static string FormatNumber(long value) => value.ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
+
+    private string GetClampedProgress()
+    {
+        var pct = double.IsNaN(CrawlerPercent) ? 0 : CrawlerPercent;
+        pct = Math.Clamp(pct, 0, 100);
+        return pct.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    private string GetClampedProgressDisplay()
+    {
+        var pct = double.IsNaN(CrawlerPercent) ? 0 : CrawlerPercent;
+        pct = Math.Clamp(pct, 0, 100);
+        return pct.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    private double CrawlerPercent => _status.CompletionPercent;
+
+    private string GetStatusClass() => _status.Status?.ToLowerInvariant() switch
+    {
+        "running" or "processing" => "status-running",
+        "completed" => "status-running",
+        "idle" or "queued" => "status-idle",
+        "error" => "status-error",
+        _ => "status-unknown"
+    };
+
+    private string GetButtonText() => _triggering ? "Triggering…" : "Run pipeline now";
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_refreshCts is not null)
+        {
+            _refreshCts.Cancel();
+            _refreshCts.Dispose();
+        }
+
+        if (_refreshTimer is not null)
+        {
+            _refreshTimer.Dispose();
+        }
+    }
+
+    private async Task TriggerPipelineAsync()
+    {
+        if (_triggering) 
+        {
+            _triggerMessage = null;
+            return;
+        }
+        _triggering = true;
+        _triggerMessage = null;
+        try
+        {
+            await TriggerService.TriggerAsync();
+            _triggerMessage = "Trigger sent via Redis.";
+        }
+        catch (Exception ex)
+        {
+            _triggerMessage = $"Failed to trigger: {ex.Message}";
+        }
+        finally
+        {
+            _triggering = false;
+        }
+    }
+}

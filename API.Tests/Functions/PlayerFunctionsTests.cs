@@ -7,6 +7,7 @@ using Domain.DB;
 using Domain.DestinyApi;
 using Domain.DTO.Requests;
 using Domain.DTO.Responses;
+using Facet.Extensions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -41,11 +42,11 @@ public class PlayerFunctionsTests
     }
 
     [Fact]
-    public async Task SearchForPlayer_ReturnsResults_WhenServiceSucceeds()
+    public async Task SearchForPlayer_ReturnsResults_FromQueryService()
     {
         var request = new SearchRequest { playerName = "Test" };
         var results = new List<PlayerSearchDto> { new() { FullDisplayName = "Tester" } };
-        _destiny2Service.Setup(s => s.SearchForPlayer("Test")).ReturnsAsync(results);
+        _queryService.Setup(q => q.SearchForPlayer("Test")).ReturnsAsync(results);
 
         var httpContext = new DefaultHttpContext();
         var result = await _functions.SearchForPlayer(httpContext.Request, request);
@@ -54,13 +55,58 @@ public class PlayerFunctionsTests
         Assert.Equal(StatusCodes.Status200OK, content.StatusCode);
         Assert.Equal("application/json", content.ContentType);
         Assert.Equal(JsonSerializer.Serialize(results, _jsonOptions), content.Content);
+        _destiny2Service.Verify(s => s.SearchForPlayer(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SearchForPlayer_FallsBackToDestinyService_WhenNoDatabaseResults()
+    {
+        var request = new SearchRequest { playerName = "Fallback" };
+        var results = new List<PlayerSearchDto> { new() { FullDisplayName = "Guardian" } };
+        _queryService.Setup(q => q.SearchForPlayer("Fallback")).ReturnsAsync(new List<PlayerSearchDto>());
+        _destiny2Service.Setup(s => s.SearchForPlayer("Fallback")).ReturnsAsync(results);
+
+        var httpContext = new DefaultHttpContext();
+        var result = await _functions.SearchForPlayer(httpContext.Request, request);
+
+        var content = Assert.IsType<ContentResult>(result);
+        Assert.Equal(StatusCodes.Status200OK, content.StatusCode);
+        Assert.Equal(JsonSerializer.Serialize(results, _jsonOptions), content.Content);
+        _destiny2Service.Verify(s => s.SearchForPlayer("Fallback"), Times.Once);
+    }
+
+    [Fact]
+    public async Task SearchForPlayer_ReturnsPlayer_ByMembershipId()
+    {
+        const string membershipId = "1234567890123456789";
+        var request = new SearchRequest { playerName = membershipId };
+        var player = new Player
+        {
+            Id = long.Parse(membershipId),
+            MembershipType = 1,
+            DisplayName = "Tester",
+            DisplayNameCode = 123,
+            FullDisplayName = "Tester#123",
+            ActivityReportPlayers = new List<ActivityReportPlayer>()
+        };
+        _queryService.Setup(q => q.GetPlayerDbObject(player.Id)).ReturnsAsync(player);
+
+        var httpContext = new DefaultHttpContext();
+        var result = await _functions.SearchForPlayer(httpContext.Request, request);
+
+        var content = Assert.IsType<ContentResult>(result);
+        Assert.Equal(StatusCodes.Status200OK, content.StatusCode);
+        Assert.Equal(JsonSerializer.Serialize(new List<PlayerSearchDto> { player.ToFacet<PlayerSearchDto>() }, _jsonOptions), content.Content);
+        _queryService.Verify(q => q.GetPlayerDbObject(player.Id), Times.Once);
+        _queryService.Verify(q => q.SearchForPlayer(It.IsAny<string>()), Times.Never);
+        _destiny2Service.Verify(s => s.SearchForPlayer(It.IsAny<string>()), Times.Never);
     }
 
     [Fact]
     public async Task SearchForPlayer_ReturnsServerError_OnException()
     {
         var request = new SearchRequest { playerName = "Error" };
-        _destiny2Service.Setup(s => s.SearchForPlayer("Error")).ThrowsAsync(new Exception());
+        _queryService.Setup(q => q.SearchForPlayer("Error")).ThrowsAsync(new Exception());
 
         var result = await _functions.SearchForPlayer(new DefaultHttpContext().Request, request);
 
@@ -98,32 +144,6 @@ public class PlayerFunctionsTests
         _queryService.Setup(q => q.GetPlayerAsync(1)).ThrowsAsync(new Exception());
 
         var result = await _functions.GetPlayer(new DefaultHttpContext().Request, 1);
-
-        var status = Assert.IsType<StatusCodeResult>(result);
-        Assert.Equal(StatusCodes.Status500InternalServerError, status.StatusCode);
-    }
-
-    [Fact]
-    public async Task GetAllPlayers_ReturnsCachedJson()
-    {
-        var players = new List<PlayerSearchDto> { new() { FullDisplayName = "Tester" } };
-        _queryService.Setup(q => q.GetAllPlayersAsync()).ReturnsAsync(players);
-        var context = new DefaultHttpContext();
-
-        var result = await _functions.GetAllPlayers(context.Request);
-
-        var content = Assert.IsType<ContentResult>(result);
-        Assert.Equal(StatusCodes.Status200OK, content.StatusCode);
-        Assert.Equal(JsonSerializer.Serialize(players, _jsonOptions), content.Content);
-        Assert.True(string.IsNullOrEmpty(context.Response.Headers.CacheControl));
-    }
-
-    [Fact]
-    public async Task GetAllPlayers_ReturnsServerError_OnException()
-    {
-        _queryService.Setup(q => q.GetAllPlayersAsync()).ThrowsAsync(new Exception());
-
-        var result = await _functions.GetAllPlayers(new DefaultHttpContext().Request);
 
         var status = Assert.IsType<StatusCodeResult>(result);
         Assert.Equal(StatusCodes.Status500InternalServerError, status.StatusCode);
@@ -168,28 +188,6 @@ public class PlayerFunctionsTests
     }
 
     [Fact]
-    public async Task LoadPlayerActivities_ReturnsNoContent_WhenUpdatedRecently()
-    {
-        var player = new Player
-        {
-            Id = 15,
-            DisplayName = "Tester",
-            DisplayNameCode = 123,
-            LastUpdateCompleted = DateTime.UtcNow,
-            MembershipType = 1
-        };
-        _queryService.Setup(q => q.GetPlayerDbObject(15)).ReturnsAsync(player);
-
-        var result = await _functions.LoadPlayerActivities(new DefaultHttpContext().Request, 15);
-
-        Assert.IsType<NoContentResult>(result);
-        _destiny2Service.Verify(s => s.GetCharactersForPlayer(Moq.It.IsAny<long>(), Moq.It.IsAny<int>()), Times.Never);
-        _destiny2Service.Verify(s => s.LoadPlayerActivityReports(Moq.It.IsAny<Player>(), It.IsAny<DateTime>(), It.IsAny<string>()), Times.Never);
-        _queryService.Verify(q => q.UpdatePlayerEmblems(Moq.It.IsAny<Player>(), Moq.It.IsAny<string>(), Moq.It.IsAny<string>()), Times.Never);
-        _queryService.Verify(q => q.GetPlayerLastPlayedActivityDate(It.IsAny<long>()), Times.Never);
-    }
-
-    [Fact]
     public async Task LoadPlayerActivities_LoadsActivitiesAndUpdatesEmblems()
     {
         var player = new Player
@@ -197,7 +195,6 @@ public class PlayerFunctionsTests
             Id = 20,
             DisplayName = "Tester",
             DisplayNameCode = 123,
-            LastUpdateCompleted = DateTime.UtcNow.AddHours(-1),
             MembershipType = 2
         };
         _queryService.Setup(q => q.GetPlayerDbObject(20)).ReturnsAsync(player);

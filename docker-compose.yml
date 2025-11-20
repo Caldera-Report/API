@@ -1,0 +1,34 @@
+services:
+  crawler:
+    build:
+      context: .
+      dockerfile: Crawler/Dockerfile
+      args:
+        BUILD_CONFIGURATION: ${BUILD_CONFIGURATION:-Release}
+    environment:
+      DOTNET_ENVIRONMENT: ${DOTNET_ENVIRONMENT:-Production}
+      ConnectionStrings__RedisConnectionString: ${REDIS_CONNECTION_STRING:?Set REDIS_CONNECTION_STRING}
+      ConnectionStrings__PostgreSqlConnectionString: ${POSTGRES_CONNECTION_STRING:?Set POSTGRES_CONNECTION_STRING}
+      Destiny2Api__Token: ${DESTINY2_API_TOKEN:?Set DESTINY2_API_TOKEN}
+      OpenTelemetry__Endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OpenTelemetry__Headers: ${OTEL_EXPORTER_OTLP_HEADERS:-}
+      OpenTelemetry__TraceSamplingRatio: ${OTEL_TRACE_SAMPLING_RATIO:-0.1}
+    restart: unless-stopped
+
+  crawler-frontend:
+    build:
+      context: .
+      dockerfile: Crawler.Frontend/Dockerfile
+      args:
+        BUILD_CONFIGURATION: ${BUILD_CONFIGURATION:-Release}
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+      DOTNET_ENVIRONMENT: ${DOTNET_ENVIRONMENT:-Production}
+      ASPNETCORE_URLS: ${FRONTEND_URLS:-http://+:8081}
+      ConnectionStrings__RedisConnectionString: ${REDIS_CONNECTION_STRING:?Set REDIS_CONNECTION_STRING}
+      ConnectionStrings__PostgreSqlConnectionString: ${POSTGRES_CONNECTION_STRING:?Set POSTGRES_CONNECTION_STRING}
+    depends_on:
+      - crawler
+    ports:
+      - "${FRONTEND_PORT:-8081}:8081"
+    restart: unless-stopped

@@ -8,54 +8,20 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using StackExchange.Redis;
+using System.Collections.Concurrent;
 using System.Threading.Channels;
+using Domain.Enums;
 
 namespace Crawler.Tests;
 
 public class PlayerCrawlerTests
 {
     [Fact]
-    public async Task RunAsync_CompletesOutputWhenSentinelEncountered()
-    {
-        var databaseMock = new Mock<IDatabase>();
-        databaseMock.Setup(db => db.ListLength("last-update-started", CommandFlags.None)).Returns(0);
-        databaseMock
-            .SetupSequence(db => db.ListLeftPopAsync("player-crawl-queue", CommandFlags.None))
-            .ReturnsAsync((RedisValue)0L);
-
-        var multiplexerMock = new Mock<IConnectionMultiplexer>();
-        multiplexerMock
-            .Setup(m => m.GetDatabase(Moq.It.IsAny<int>(), Moq.It.IsAny<object>()))
-            .Returns(databaseMock.Object);
-
-        var clientMock = new Mock<IDestiny2ApiClient>();
-        var contextFactoryMock = new Mock<IDbContextFactory<AppDbContext>>();
-        var channel = Channel.CreateUnbounded<CharacterWorkItem>();
-
-        var crawler = new PlayerCrawler(
-            multiplexerMock.Object,
-            clientMock.Object,
-            channel.Writer,
-            NullLogger<PlayerCrawler>.Instance,
-            contextFactoryMock.Object);
-
-        await crawler.RunAsync(CancellationToken.None);
-
-        await channel.Reader.Completion.WaitAsync(TimeSpan.FromMilliseconds(100));
-        Assert.False(channel.Reader.TryRead(out _));
-        databaseMock.Verify(db => db.ListLeftPopAsync("player-crawl-queue", CommandFlags.None), Times.Once);
-    }
-
-    [Fact]
     public async Task RunAsync_EnqueuesCharacterWorkItemsForRecentCharacters()
     {
         const long playerId = 12345;
         var databaseMock = new Mock<IDatabase>();
         databaseMock.Setup(db => db.ListLength("last-update-started", CommandFlags.None)).Returns(0);
-        databaseMock
-            .SetupSequence(db => db.ListLeftPopAsync("player-crawl-queue", CommandFlags.None))
-            .ReturnsAsync((RedisValue)playerId)
-            .ReturnsAsync((RedisValue)0L);
 
         var multiplexerMock = new Mock<IConnectionMultiplexer>();
         multiplexerMock
@@ -75,7 +41,13 @@ public class PlayerCrawlerTests
                 MembershipType = 2,
                 DisplayName = "Guardian",
                 DisplayNameCode = 7777,
+                FullDisplayName = "Guardian#7777",
                 NeedsFullCheck = false
+            });
+            seedContext.PlayerCrawlQueue.Add(new PlayerCrawlQueue
+            {
+                PlayerId = playerId,
+                Status = PlayerQueueStatus.Queued
             });
             await seedContext.SaveChangesAsync();
         }
@@ -129,22 +101,27 @@ public class PlayerCrawlerTests
         clientMock.Setup(client => client.GetCharactersForPlayer(playerId, 2, Moq.It.IsAny<CancellationToken>()))
             .ReturnsAsync(apiResponse);
 
+        var playerCharacterWorkCount = new ConcurrentDictionary<long, int>();
+
         var crawler = new PlayerCrawler(
             multiplexerMock.Object,
             clientMock.Object,
             channel.Writer,
             NullLogger<PlayerCrawler>.Instance,
-            contextFactory);
+            contextFactory,
+            playerCharacterWorkCount);
 
-        await crawler.RunAsync(CancellationToken.None);
+        using var cts = new CancellationTokenSource();
+        var runTask = crawler.RunAsync(cts.Token);
 
-        Assert.True(channel.Reader.TryRead(out var workItem));
+        var workItem = await channel.Reader.ReadAsync();
         Assert.Equal(playerId, workItem.PlayerId);
         Assert.Equal("recent-character", workItem.CharacterId);
-        Assert.False(channel.Reader.TryRead(out _));
-        await channel.Reader.Completion.WaitAsync(TimeSpan.FromMilliseconds(100));
 
-        clientMock.Verify(client => client.GetCharactersForPlayer(playerId, 2, Moq.It.IsAny<CancellationToken>()), Times.Once);
+        cts.Cancel();
+        await runTask;
+
+        clientMock.Verify(client => client.GetCharactersForPlayer(playerId, 2, Moq.It.IsAny<CancellationToken>()), Times.AtLeastOnce);
     }
 
     [Fact]
@@ -170,6 +147,7 @@ public class PlayerCrawlerTests
                 MembershipType = 3,
                 DisplayName = "OldName",
                 DisplayNameCode = 1234,
+                FullDisplayName = "OldName#1234",
                 NeedsFullCheck = true
             });
             await seedContext.SaveChangesAsync();
@@ -180,12 +158,15 @@ public class PlayerCrawlerTests
         var clientMock = new Mock<IDestiny2ApiClient>();
         var channel = Channel.CreateUnbounded<CharacterWorkItem>();
 
+        var playerCharacterWorkCount = new ConcurrentDictionary<long, int>();
+
         var crawler = new PlayerCrawler(
             multiplexerMock.Object,
             clientMock.Object,
             channel.Writer,
             NullLogger<PlayerCrawler>.Instance,
-            new TestDbContextFactory(options));
+            new TestDbContextFactory(options),
+            playerCharacterWorkCount);
 
         var profileResponse = new DestinyProfileResponse
         {
@@ -202,7 +183,16 @@ public class PlayerCrawlerTests
             },
             characters = new DictionaryComponentResponseOfint64AndDestinyCharacterComponent
             {
-                data = new Dictionary<string, DestinyCharacterComponent>()
+                data = new Dictionary<string, DestinyCharacterComponent>
+                {
+                    ["char-1"] = new DestinyCharacterComponent
+                    {
+                        characterId = "char-1",
+                        dateLastPlayed = DateTime.UtcNow,
+                        emblemBackgroundPath = "bg",
+                        emblemPath = "emblem"
+                    }
+                }
             }
         };
 
@@ -213,5 +203,7 @@ public class PlayerCrawlerTests
         Assert.NotNull(updated);
         Assert.Equal("NewName", updated!.DisplayName);
         Assert.Equal(5678, updated.DisplayNameCode);
+        Assert.Equal("emblem", updated.LastPlayedCharacterEmblemPath);
+        Assert.Equal("bg", updated.LastPlayedCharacterBackgroundPath);
     }
 }

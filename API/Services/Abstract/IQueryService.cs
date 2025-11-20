@@ -1,6 +1,7 @@
 ﻿using API.Models.Responses;
 using Domain.DB;
 using Domain.DTO.Responses;
+using Domain.Enums;
 
 namespace API.Services.Abstract
 {
@@ -13,14 +14,10 @@ namespace API.Services.Abstract
         public Task<PlayerDto> GetPlayerAsync(long id);
         public Task<Player> GetPlayerDbObject(long id);
         public Task<ActivityReportListDTO> GetPlayerReportsForActivityAsync(long playerId, long activityId);
-        public Task<List<CompletionsLeaderboardResponse>> GetCompletionsLeaderboardAsync(long activityId);
-        public Task<List<TimeLeaderboardResponse>> GetSpeedLeaderboardAsync(long activityId);
-        public Task<List<TimeLeaderboardResponse>> GetTotalTimeLeaderboardAsync(long activityId);
-        public Task ComputeCompletionsLeaderboardAsync(long activityId);
-        public Task ComputeSpeedLeaderboardAsync(long activityId);
-        public Task ComputeTotalTimeLeaderboardAsync(long activityId);
+        public Task<List<LeaderboardResponse>> GetLeaderboardAsync(long activityId, LeaderboardTypes type, int count, int offset);
         public Task UpdatePlayerEmblems(Player player, string backgroundEmblemPath, string emblemPath);
         public Task<DateTime> GetPlayerLastPlayedActivityDate(long membershipId);
-        public Task LoadPlayersQueue();
+        public Task<List<PlayerSearchDto>> SearchForPlayer(string query);
+        public Task<List<LeaderboardResponse>> GetLeaderboardsForPlayer(string playerName, long activityId, LeaderboardTypes type);
     }
 }
