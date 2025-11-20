@@ -145,7 +145,7 @@ namespace API.Services
             {
                 var reports = await _context.ActivityReportPlayers
                     .Include(arp => arp.ActivityReport)
-                    .Where(arp => arp.ActivityReport.ActivityId == activityId && arp.PlayerId == playerId)
+                    .Where(arp => arp.ActivityId == activityId && arp.PlayerId == playerId)
                     .Select(ActivityReportPlayerFacet.Projection)
                     .ToListAsync();
                 var averageMs = reports.Count(r => r.Completed) > 0 ? reports.Where(r => r.Completed).Select(r => r.Duration.TotalMilliseconds).Average() : 0;
