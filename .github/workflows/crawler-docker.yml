@@ -5,10 +5,11 @@ on:
     branches:
       - master
     paths:
-      - 'Crawler/**'
-      - 'Crawler.Frontend/**'
-      - 'Domain/**'
-      - '.github/workflows/crawler-docker.yml'
+      - "Crawler/**"
+      - "Crawler.Frontend/**"
+      - "Domain/**"
+      - ".github/workflows/crawler-docker.yml"
+  workflow_dispatch:
 
 jobs:
   build-and-push:
