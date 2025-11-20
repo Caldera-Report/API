@@ -247,7 +247,7 @@ namespace API.Services
             try
             {
                 var results = await _context.Players
-                    .Where(p => EF.Functions.ILike(p.DisplayName, $"%{query}%"))
+                    .Where(p => EF.Functions.ILike(p.FullDisplayName, $"%{query}%"))
                     .Select(PlayerSearchDto.Projection)
                     .Take(25)
                     .ToListAsync();
