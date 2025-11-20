@@ -129,7 +129,7 @@ namespace API.Services
                 var player = await _context.Players
                     .FirstOrDefaultAsync(p => p.Id == id);
                 if (player is null)
-                    throw new Exception("Player not found");
+                    throw new ArgumentException("Player not found");
                 return player;
             }
             catch (Exception ex)

@@ -43,15 +43,21 @@ public class PlayerFunctions
         {
             if (Regex.IsMatch(playerName, @"^\d{19}$"))
             {
-                return new ContentResult
+                try
                 {
-                    Content = JsonSerializer.Serialize(new List<PlayerSearchDto>() 
-                    { 
-                        (await _queryService.GetPlayerDbObject(long.Parse(playerName))).ToFacet<PlayerSearchDto>() 
+                    return new ContentResult
+                    {
+                        Content = JsonSerializer.Serialize(new List<PlayerSearchDto>()
+                    {
+                        (await _queryService.GetPlayerDbObject(long.Parse(playerName))).ToFacet<PlayerSearchDto>()
                     }, _jsonOptions),
-                    StatusCode = StatusCodes.Status200OK,
-                    ContentType = "application/json"
-                };
+                        StatusCode = StatusCodes.Status200OK,
+                        ContentType = "application/json"
+                    };
+                }
+                catch (ArgumentException ex) when (ex.Message.Contains("not found"))
+                { //Swallow to allow for searching of bungie api (just in case)
+                }
             }
                 
             var searchResults = await _queryService.SearchForPlayer(playerName);
