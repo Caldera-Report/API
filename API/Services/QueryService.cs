@@ -171,7 +171,7 @@ namespace API.Services
             {
                 if (count == 250 && offset == 0)
                 {
-                    var cachedData = await _cache.StringGetAsync($"leaderboard:activity:{activityId}:type:{type}");
+                    var cachedData = await _cache.StringGetAsync($"leaderboard:activity:{activityId}:type:{(int)type}");
                     if (cachedData.HasValue)
                     {
                         var leaderboardData = JsonSerializer.Deserialize<List<PlayerLeaderboard>>(cachedData!);
@@ -182,6 +182,7 @@ namespace API.Services
                                 {
                                     Player = new PlayerDto(pl.Player),
                                     Rank = pl.Rank,
+                                    Data = pl.Data?.Completions?.ToString("0,0", CultureInfo.InvariantCulture) ?? pl.Data?.Score?.ToString("0,0", CultureInfo.InvariantCulture) ?? pl.Data?.Duration.ToString() ?? string.Empty
                                 })
                                 .ToList();
                         }

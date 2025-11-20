@@ -40,8 +40,11 @@ namespace Domain.Data
                 entity.HasKey(arp => new { arp.ActivityReportId, arp.PlayerId });
                 entity.HasIndex(arp => new { arp.ActivityReportId, arp.PlayerId })
                     .HasFilter("\"Completed\" = TRUE");
+                entity.HasIndex(arp => new {arp.ActivityId, arp.Completed, arp.Duration})
+                    .HasFilter("\"Completed\" = TRUE");
                 entity.HasIndex(arp => new { arp.ActivityReportId, arp.PlayerId, arp.Score });
                 entity.HasIndex(arp => new { arp.ActivityReportId, arp.PlayerId, arp.Duration });
+                entity.HasIndex(arp => new { arp.ActivityId });
             });
 
             modelBuilder.Entity<PlayerLeaderboard>(entity =>

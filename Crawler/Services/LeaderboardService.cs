@@ -49,9 +49,7 @@ namespace Crawler.Services
         {
             foreach (var activity in activities)
             {
-                await using var cmd = new NpgsqlCommand("CALL compute_leaderboard_duration(@activityId)", context.Database.GetDbConnection() as NpgsqlConnection);
-                cmd.Parameters.AddWithValue("activityId", activity.Id);
-                await cmd.ExecuteNonQueryAsync(ct);
+                _ = await context.Database.ExecuteSqlAsync($"CALL compute_leaderboard_duration({activity.Id})", ct);
             }
         }
 
@@ -59,9 +57,7 @@ namespace Crawler.Services
         {
             foreach (var activity in activities)
             {
-                await using var cmd = new NpgsqlCommand("CALL compute_leaderboard_completions(@activityId)", context.Database.GetDbConnection() as NpgsqlConnection);
-                cmd.Parameters.AddWithValue("activityId", activity.Id);
-                await cmd.ExecuteNonQueryAsync(ct);
+                _ = await context.Database.ExecuteSqlAsync($"CALL compute_leaderboard_completions({activity.Id})", ct);
             }
         }
 
@@ -69,9 +65,7 @@ namespace Crawler.Services
         {
             foreach (var activity in activities)
             {
-                await using var cmd = new NpgsqlCommand("CALL compute_leaderboard_score(@activityId)", context.Database.GetDbConnection() as NpgsqlConnection);
-                cmd.Parameters.AddWithValue("activityId", activity.Id);
-                await cmd.ExecuteNonQueryAsync(ct);
+                _ = await context.Database.ExecuteSqlAsync($"CALL compute_leaderboard_score({activity.Id})", ct);
             }
         }
     }

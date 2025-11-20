@@ -7,6 +7,7 @@
         public int Score { get; set; }
         public bool Completed { get; set; }
         public TimeSpan Duration { get; set; }
+        public long? ActivityId { get; set; }
 
         public Player Player { get; set; }
         public ActivityReport ActivityReport { get; set; }

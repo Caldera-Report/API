@@ -212,7 +212,8 @@ namespace Crawler.Services
                             ActivityReportId = reportId,
                             Score = group.Value.Sum(e => (int)e.values.score.basic.value),
                             Completed = group.Value.All(e => e.values.completed.basic.value == 1 && e.values.completionReason.basic.value != 2.0),
-                            Duration = TimeSpan.FromSeconds(group.Value.Sum(e => e.values.activityDurationSeconds.basic.value))
+                            Duration = TimeSpan.FromSeconds(group.Value.Sum(e => e.values.activityDurationSeconds.basic.value)),
+                            ActivityId = activityId
                         });
                     }
                 }
