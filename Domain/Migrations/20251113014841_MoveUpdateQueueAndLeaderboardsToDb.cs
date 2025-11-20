@@ -86,7 +86,7 @@ namespace API.Domain.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.Sql(@"DROP INDEX IF EXISTS `idx_playerleaderboards_fulldisplayname_trgm`;");
+            migrationBuilder.Sql(@"DROP INDEX IF EXISTS ""idx_playerleaderboards_fulldisplayname_trgm"";");
 
             migrationBuilder.DropTable(
                 name: "PlayerCrawlQueue");

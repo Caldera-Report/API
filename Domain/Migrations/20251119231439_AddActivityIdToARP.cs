@@ -155,6 +155,14 @@ namespace API.Domain.Migrations
                 name: "ActivityId",
                 table: "ActivityReportPlayers");
 
+            migrationBuilder.DropIndex(
+                name: "idx_arp_activityid_cover",
+                table: "ActivityReportPlayers");
+
+            migrationBuilder.DropIndex(
+                name: "idx_players_id_cover",
+                table: "Players");
+
             migrationBuilder.Sql(@"
                 CREATE OR REPLACE PROCEDURE compute_leaderboard_duration(activity_id bigint)
                 LANGUAGE sql
