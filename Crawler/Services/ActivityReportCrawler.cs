@@ -25,9 +25,9 @@ namespace Crawler.Services
         private const int MaxConcurrentTasks = 200;
 
         public ActivityReportCrawler(
-            ILogger<ActivityReportCrawler> logger, 
-            IDbContextFactory<AppDbContext> contextFactory, 
-            IDestiny2ApiClient client, ChannelReader<ActivityReportWorkItem> input, 
+            ILogger<ActivityReportCrawler> logger,
+            IDbContextFactory<AppDbContext> contextFactory,
+            IDestiny2ApiClient client, ChannelReader<ActivityReportWorkItem> input,
             ChannelWriter<PgcrWorkItem> output,
             ConcurrentDictionary<long, int> playerActivityCount)
         {
@@ -57,7 +57,7 @@ namespace Crawler.Services
                 }
 
                 await Task.WhenAll(activeTasks);
-                _logger.LogInformation("Activity report crawler drained input channel."); 
+                _logger.LogInformation("Activity report crawler drained input channel.");
             }
             catch (OperationCanceledException)
             {
@@ -113,7 +113,7 @@ namespace Crawler.Services
                         }
                         else
                         {
-                            var playerQueueItem = await context.PlayerCrawlQueue.FirstOrDefaultAsync(pcq => pcq.PlayerId == item.PlayerId, ct) 
+                            var playerQueueItem = await context.PlayerCrawlQueue.FirstOrDefaultAsync(pcq => pcq.PlayerId == item.PlayerId, ct)
                                 ?? throw new InvalidOperationException($"Player queue item with playerId {item.PlayerId} does not exist");
                             if (playerQueueItem.Status != PlayerQueueStatus.Error)
                             {

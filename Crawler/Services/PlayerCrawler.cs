@@ -61,7 +61,7 @@ namespace Crawler.Services
                 try
                 {
                     var context = _contextFactory.CreateDbContext();
-                    var playerValue = await context.PlayerCrawlQueue.Where(pcq => pcq.Status == PlayerQueueStatus.Queued || 
+                    var playerValue = await context.PlayerCrawlQueue.Where(pcq => pcq.Status == PlayerQueueStatus.Queued ||
                     (pcq.Status == PlayerQueueStatus.Error && pcq.Attempts < 3)).FirstOrDefaultAsync(ct);
                     if (playerValue == null)
                     {

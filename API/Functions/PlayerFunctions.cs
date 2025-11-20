@@ -59,7 +59,7 @@ public class PlayerFunctions
                 { //Swallow to allow for searching of bungie api (just in case)
                 }
             }
-                
+
             var searchResults = await _queryService.SearchForPlayer(playerName);
             if (searchResults.Count == 0)
                 searchResults = await _destiny2Service.SearchForPlayer(playerName);

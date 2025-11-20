@@ -26,10 +26,10 @@ namespace Crawler.Services
 
         private static readonly ConcurrentDictionary<long, byte> _inFlightReports = new();
 
-        public PgcrProcessor(ChannelReader<PgcrWorkItem> input, 
-            IConnectionMultiplexer redis, 
-            IDbContextFactory<AppDbContext> contextFactory, 
-            ILogger<PgcrProcessor> logger, 
+        public PgcrProcessor(ChannelReader<PgcrWorkItem> input,
+            IConnectionMultiplexer redis,
+            IDbContextFactory<AppDbContext> contextFactory,
+            ILogger<PgcrProcessor> logger,
             ConcurrentDictionary<long, int> playerActivityCount,
             Dictionary<long, long> activityHashMap)
         {

@@ -120,9 +120,9 @@ namespace Crawler.Services
                 activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
                 _logger.LogError(ex, "Error processing CharacterWorkItem for player: {PlayerId}, character: {CharacterId}", item.PlayerId, item.CharacterId);
                 await using var context = await _contextFactory.CreateDbContextAsync(ct);
-                var playerQueueItem = await context.PlayerCrawlQueue.FirstOrDefaultAsync(p => p.PlayerId == item.PlayerId, ct) 
+                var playerQueueItem = await context.PlayerCrawlQueue.FirstOrDefaultAsync(p => p.PlayerId == item.PlayerId, ct)
                     ?? throw new InvalidOperationException($"Player with Id {item.PlayerId} cannot be found");
-                var player = await context.Players.FirstOrDefaultAsync(p => p.Id == item.PlayerId, ct) 
+                var player = await context.Players.FirstOrDefaultAsync(p => p.Id == item.PlayerId, ct)
                     ?? throw new InvalidOperationException($"Player with Id {item.PlayerId} cannot be found");
 
                 playerQueueItem.Status = PlayerQueueStatus.Error;
