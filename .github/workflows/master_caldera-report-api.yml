@@ -49,6 +49,14 @@ jobs:
         shell: pwsh
         run: dotnet publish './${{ env.FUNCTIONS_PROJECT_FILE }}' --configuration Release --output './${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
 
+      - name: Generate EF configuration
+        shell: pwsh
+        run: |
+          $config = @{
+            ConnectionStrings = @{ PostgreSqlConnectionString = "${{ env.ConnectionStrings__PostgreSqlConnectionString }}" }
+          } | ConvertTo-Json -Depth 5
+          $config | Set-Content -Path "./API/appsettings.json" -Encoding UTF8
+
       - name: Install dotnet-ef CLI
         shell: pwsh
         run: dotnet tool install --global dotnet-ef --version 9.0.10
