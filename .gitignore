@@ -266,3 +266,4 @@ __pycache__/
 /API.Domain/appsettings.json
 .playwright-mcp
 .env
+/Crawler/appsettings.Development.json
