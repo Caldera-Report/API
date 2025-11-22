@@ -77,7 +77,18 @@ await host.RunAsync();
 // ---- Helpers ----
 void ConfigureOpenTelemetry(HostApplicationBuilder b)
 {
-    var samplingRatio = Math.Clamp(b.Configuration.GetValue<double?>("OpenTelemetry:TraceSamplingRatio") ?? 1.0, 0.0001, 1.0);
+    var cfg = b.Configuration;
+    var baseEndpoint = cfg["OpenTelemetry:Endpoint"]?.TrimEnd('/');
+
+    if (string.IsNullOrWhiteSpace(baseEndpoint))
+        throw new InvalidOperationException("OpenTelemetry:Endpoint must be set.");
+
+    // Build correct per-signal endpoints
+    var tracesEndpoint = new Uri($"{baseEndpoint}/v1/traces");
+    var metricsEndpoint = new Uri($"{baseEndpoint}/v1/metrics");
+    var logsEndpoint = new Uri($"{baseEndpoint}/v1/logs");
+
+    var samplingRatio = Math.Clamp(cfg.GetValue<double?>("OpenTelemetry:TraceSamplingRatio") ?? 1.0, 0.0001, 1.0);
 
     Action<ResourceBuilder> configureResource = resource =>
     {
@@ -85,37 +96,23 @@ void ConfigureOpenTelemetry(HostApplicationBuilder b)
         var serviceName = b.Environment.ApplicationName ?? assembly.Name ?? "Crawler";
         var serviceVersion = assembly.Version?.ToString() ?? "unknown";
 
-        resource.AddService(serviceName: serviceName, serviceVersion: serviceVersion, serviceInstanceId: Environment.MachineName)
+        resource.AddService(serviceName, serviceVersion, Environment.MachineName)
                 .AddAttributes(new[]
                 {
-                    new KeyValuePair<string, object>("deployment.environment", b.Environment.EnvironmentName)
+                    new KeyValuePair<string, object>("deployment.environment", b.Environment.EnvironmentName),
                 });
     };
 
-    Action<OtlpExporterOptions> configureExporter = options =>
+    // Reusable batch config
+    Action<BatchExportProcessorOptions<Activity>> configureBatch = batch =>
     {
-        var endpoint = b.Configuration["OpenTelemetry:Endpoint"];
-        if (!string.IsNullOrWhiteSpace(endpoint) && Uri.TryCreate(endpoint, UriKind.Absolute, out var otlpEndpoint))
-        {
-            options.Endpoint = otlpEndpoint;
-        }
-
-        options.BatchExportProcessorOptions = new BatchExportProcessorOptions<Activity>
-        {
-            MaxQueueSize = 2048,
-            ScheduledDelayMilliseconds = 5000,
-            ExporterTimeoutMilliseconds = 30000,
-            MaxExportBatchSize = 512,
-        };
-
-        options.Protocol = OtlpExportProtocol.Grpc;
-
-        var headers = b.Configuration["OpenTelemetry:Headers"];
-        if (!string.IsNullOrWhiteSpace(headers))
-        {
-            options.Headers = headers;
-        }
+        batch.MaxQueueSize = 2048;
+        batch.ScheduledDelayMilliseconds = 5000;
+        batch.ExporterTimeoutMilliseconds = 30000;
+        batch.MaxExportBatchSize = 512;
     };
+
+    string headers = cfg["OpenTelemetry:Headers"];
 
     b.Services.AddOpenTelemetry()
         .ConfigureResource(configureResource)
@@ -125,7 +122,14 @@ void ConfigureOpenTelemetry(HostApplicationBuilder b)
             metrics.AddHttpClientInstrumentation();
             metrics.AddAspNetCoreInstrumentation();
             metrics.AddNpgsqlInstrumentation();
-            metrics.AddOtlpExporter(configureExporter);
+
+            metrics.AddOtlpExporter(opts =>
+            {
+                opts.Endpoint = metricsEndpoint;
+                opts.Protocol = OtlpExportProtocol.HttpProtobuf;
+                if (!string.IsNullOrWhiteSpace(headers))
+                    opts.Headers = headers;
+            });
         })
         .WithTracing(tracing =>
         {
@@ -134,7 +138,15 @@ void ConfigureOpenTelemetry(HostApplicationBuilder b)
             tracing.AddNpgsql();
             tracing.AddSource(CrawlerTelemetry.ActivitySourceName);
             tracing.SetSampler(new TraceIdRatioBasedSampler(samplingRatio));
-            tracing.AddOtlpExporter(configureExporter);
+
+            tracing.AddOtlpExporter(opts =>
+            {
+                opts.Endpoint = tracesEndpoint;
+                opts.Protocol = OtlpExportProtocol.HttpProtobuf;
+                configureBatch(opts.BatchExportProcessorOptions);
+                if (!string.IsNullOrWhiteSpace(headers))
+                    opts.Headers = headers;
+            });
         });
 
     b.Logging.AddOpenTelemetry(options =>
@@ -147,27 +159,24 @@ void ConfigureOpenTelemetry(HostApplicationBuilder b)
         configureResource(resourceBuilder);
         options.SetResourceBuilder(resourceBuilder);
 
-        options.AddOtlpExporter(configureExporter);
+        options.AddOtlpExporter(opts =>
+        {
+            opts.Endpoint = logsEndpoint;
+            opts.Protocol = OtlpExportProtocol.HttpProtobuf;
+            if (!string.IsNullOrWhiteSpace(headers))
+                opts.Headers = headers;
+        });
     });
 
+    // Logging filters
     b.Logging.AddFilter<OpenTelemetryLoggerProvider>(filter =>
     {
-        if (b.Environment.IsDevelopment())
-        {
-            return filter >= LogLevel.Information;
-        }
-        else
-        {
-            return filter >= LogLevel.Warning;
-        }
+        return b.Environment.IsDevelopment()
+            ? filter >= LogLevel.Information
+            : filter >= LogLevel.Warning;
     });
 
-    if (b.Environment.IsDevelopment())
-    {
-        b.Logging.AddFilter("Microsoft.Extensions.Logging.Console", LogLevel.Debug);
-    }
-    else
-    {
-        b.Logging.AddFilter("Microsoft.Extensions.Logging.Console", LogLevel.Information);
-    }
+    b.Logging.AddFilter("Microsoft.Extensions.Logging.Console",
+        b.Environment.IsDevelopment() ? LogLevel.Debug : LogLevel.Information);
 }
+
